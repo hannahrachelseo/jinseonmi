@@ -7,8 +7,9 @@ const CATS = {
   seon: { ko: '선', han: '善', sub: '관계 · 마음 · 나눔', tint: '#E3EED9', strong: '#5E8C3F', ink: '#3F6B26', bar: '#9CC77A', light: '#C3E0A6' },
   mi:   { ko: '미', han: '美', sub: '건강 · 몸 · 자기관리', tint: '#FFE1DA', strong: '#D9645A', ink: '#A63F37', bar: '#F08C80', light: '#F7B8AE' },
   il:   { ko: '일', han: '業', sub: '업무 · 커리어 · 돈',   tint: '#EAE3F2', strong: '#7E5BA6', ink: '#5B3D80', bar: '#B49AD6', light: '#CDBAE6' },
+  etc:  { ko: '기타', han: '', sub: '그 밖의 것들', tint: '#EFE7DD', strong: '#8A7360', ink: '#5C4536', bar: '#BFA892', light: '#D9C3AA' },
 };
-const CAT_KEYS = ['jin', 'seon', 'mi', 'il'];
+const CAT_KEYS = ['jin', 'seon', 'mi', 'il', 'etc'];
 const LIB = { '대화법': ['#FCE3D3', '#9C4A2A'], '연애': ['#FFE9DA', '#8F3F0A'], '재테크': ['#FFF4CC', '#7A5600'], '자기관리·계발': ['#E3EED9', '#3F6B26'] };
 const MOODS = ['최고', '좋음', '보통', '지침'];
 const WK = ['일', '월', '화', '수', '목', '금', '토'];
@@ -182,6 +183,7 @@ const I = {
     habits: '<path d="M20 12a8 8 0 1 1-3-6.2"/><path d="M20 4v5h-5"/>',
     stats: '<path d="M5 20V11M12 20V5M19 20v-7"/>',
     library: '<path d="M6 3.5h12v17l-6-4-6 4z"/>',
+    challenge: '<path d="M8 4h8v5a4 4 0 0 1-8 0z"/><path d="M8 6H5a3 3 0 0 0 3 4M16 6h3a3 3 0 0 1-3 4M12 13v4M8.5 20h7"/>',
   },
 };
 
@@ -190,10 +192,10 @@ const ui = {
   view: (location.hash.slice(1) || 'today'),
   habitFilter: 'all', statTab: '일',
   calSel: today(), calMonth: today().slice(0, 7),
-  libTab: '전체', libCat: '대화법', newCat: 'jin',
+  libTab: '전체', libCat: '대화법', libMode: 'link', newCat: 'jin',
   undo: null, flash: '',
 };
-const NAV = [['today', '오늘'], ['calendar', '캘린더'], ['habits', '습관'], ['stats', '성취율'], ['library', '보관함']];
+const NAV = [['today', '오늘'], ['calendar', '캘린더'], ['habits', '습관'], ['stats', '성취율'], ['library', '보관함'], ['challenge', '도전']];
 
 function go(view) { ui.view = view; history.replaceState(null, '', '#' + view); render(); window.scrollTo(0, 0); }
 let flashTimer;
@@ -257,7 +259,7 @@ function vToday() {
       <div class="col"><span class="small muted">${longDate(t)}</span><h1>Hannah's ToDo</h1></div>
     </div>
     <div class="col" style="align-items:center">
-      <button class="mascot-btn" data-act="go" data-view="friends" aria-label="오늘의 친구 ${m.name} 보기">${mascotFor(mi, 64)}</button>
+      <button class="mascot-btn" data-act="go" data-view="friends" aria-label="오늘의 친구 ${m.name} 보기">${mascotFor(mi, 64)}<span class="xs" style="color:var(--muted);margin-top:-6px">오늘의 친구</span></button>
       <button class="points-pill" style="border:none" data-act="go" data-view="challenge">${totalPoints().toLocaleString('ko-KR')}P</button>
     </div>
   </header>
@@ -278,10 +280,10 @@ function vToday() {
   ${CAT_KEYS.map((k) => { const c = CATS[k]; return `
   <section class="banner" style="background:${c.tint}" aria-label="${c.ko} 영역">
     <div class="banner-head">
-      <div class="banner-title" style="color:${c.ink}"><b>${c.ko} ${c.han}</b><span>${c.sub}</span></div>
+      <div class="banner-title" style="color:${c.ink}"><b>${c.ko}${c.han ? ' ' + c.han : ''}</b></div>
       <button class="icon-btn" style="color:${c.ink}" data-act="addTask" data-cat="${k}" aria-label="${c.ko} 영역에 할 일 추가">${I.plus}</button>
     </div>
-    ${byCat[k].list.length ? byCat[k].list.map(itemRow).join('') : `<div class="empty">+ 를 눌러 오늘의 ${c.ko}을 적어보세요</div>`}
+    ${byCat[k].list.length ? byCat[k].list.map(itemRow).join('') : `<div class="empty">+ 를 눌러 오늘의 ${c.ko} 할 일을 적어보세요</div>`}
   </section>`; }).join('')}
 
   <section class="card" aria-label="오늘의 기록">
@@ -328,7 +330,7 @@ function vCalendar() {
     <form data-form="calAdd" class="col" style="gap:10px;border-top:1px dashed var(--line);padding-top:12px">
       <label class="lbl" for="cal-title">이 날 할 일 미리 추가</label>
       <input id="cal-title" name="title" class="field" placeholder="예: 헬스장 등록 상담" autocomplete="off" required>
-      <div class="cats" role="radiogroup" aria-label="영역">${CAT_KEYS.map((k) => catOpt(k, ui.newCat === k, 'setNewCat')).join('')}<button class="btn" style="flex:1.4" type="submit">추가</button></div>
+      <div class="cats" role="radiogroup" aria-label="영역">${CAT_KEYS.map((k) => catOpt(k, ui.newCat === k, 'setNewCat')).join('')}</div><button class="btn" type="submit">추가</button>
     </form>
   </section>`;
 }
@@ -369,7 +371,7 @@ function vHabits() {
     <div class="rule" style="background:var(--gold-bg);color:var(--gold)"><b class="small">7일 연속 성공</b><span class="hand" style="font-size:24px;color:var(--gold-dark)">+${PTS.streak7}P</span><span class="small">연속 스탬프 1개</span></div>
     <div class="rule" style="background:var(--warn-bg);color:var(--warn)"><b class="small">3일 연속 미수행</b><span class="hand" style="font-size:24px;color:#6E2F05">${PTS.miss3}P</span><span class="small">회복 미션 성공 시 +${PTS.recover}P</span></div>
   </section>
-  <div class="row" role="group" aria-label="영역 필터" style="gap:8px">${[['all', '전체'], ...CAT_KEYS.map((k) => [k, CATS[k].ko])].map(([k, l]) => `<button class="chip ${ui.habitFilter === k ? 'on' : ''}" ${ui.habitFilter === k && k !== 'all' ? `style="background:${CATS[k].strong}"` : ''} data-act="habitFilter" data-k="${k}" aria-pressed="${ui.habitFilter === k}">${l}</button>`).join('')}</div>
+  <div class="row" role="group" aria-label="영역 필터" style="gap:8px;flex-wrap:wrap">${[['all', '전체'], ...CAT_KEYS.map((k) => [k, CATS[k].ko])].map(([k, l]) => `<button class="chip ${ui.habitFilter === k ? 'on' : ''}" ${ui.habitFilter === k && k !== 'all' ? `style="background:${CATS[k].strong}"` : ''} data-act="habitFilter" data-k="${k}" aria-pressed="${ui.habitFilter === k}">${l}</button>`).join('')}</div>
   ${list.length ? list.map(card).join('') : `<div class="card" style="align-items:center;text-align:center">${mascotFor(mascotIndex(), 72)}<span class="muted">${S.habits.length ? '이 영역에는 아직 습관이 없어요' : '첫 습관을 만들어볼까요? 매일 오늘 할 일에 자동으로 들어가요'}</span><button class="btn" data-act="addHabit">+ 새 습관</button>${S.habits.length ? '' : '<button class="btn ghost" data-act="seedHabits">예시 습관 3개 넣어보기</button>'}</div>`}`;
 }
 
@@ -427,7 +429,7 @@ function vStats() {
     <div class="chart">${bars.map((b) => `<div class="b"><span>${b.v ?? ''}</span><i style="height:${b.v ? b.v * 1.15 : 3}px;background:${b.v === null ? 'var(--dark2)' : b.v >= 80 ? '#C3E0A6' : b.v >= 50 ? '#F2A97E' : '#F7B8AE'}"></i></div>`).join('')}</div>
     <div class="chart-l" style="margin-top:-8px">${bars.map((b) => `<span>${b.l}</span>`).join('')}</div>
   </section>
-  <section class="trio">${CAT_KEYS.map((k) => { const c = CATS[k]; const v = catRate(k); return `<div style="background:${c.tint};color:${c.ink}"><span class="hand" style="font-size:18px">${c.ko}</span><span class="hand" style="font-size:28px">${v ?? '–'}${v === null ? '' : '%'}</span><span class="xs">${c.sub.split(' · ').slice(0, 2).join(' · ')}</span></div>`; }).join('')}</section>
+  <section class="trio">${CAT_KEYS.map((k) => { const c = CATS[k]; const v = catRate(k); return `<div style="background:${c.tint};color:${c.ink}"><span class="hand" style="font-size:18px">${c.ko}</span><span class="hand" style="font-size:28px">${v ?? '–'}${v === null ? '' : '%'}</span></div>`; }).join('')}</section>
   <section class="card"><b style="font-size:14px">습관별 달성률</b>
     ${rows.length ? rows.map(({ h, v }) => { const c = CATS[h.cat]; return `<div class="row" style="font-size:13px"><span class="hand" style="width:20px;font-size:16px;color:${c.ink}">${c.ko}</span><span style="width:120px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(h.name)}</span><div class="track grow" style="background:var(--soft);height:10px"><i style="height:10px;width:${v ?? 0}%;background:${c.strong}"></i></div><b style="width:40px;text-align:right">${v ?? '–'}${v === null ? '' : '%'}</b></div>`; }).join('') : '<span class="small muted">습관을 만들면 여기서 달성률을 볼 수 있어요</span>'}
   </section>
@@ -444,20 +446,23 @@ function vLibrary() {
   return `
   <header class="col"><span class="small muted">${S.library.length}개 중 ${doneN}개 봤어요</span><h1>나중에 볼 것</h1></header>
   <form class="card" data-form="libAdd">
-    <label class="lbl" for="lib-url">링크 붙여넣기</label>
+    <div class="row" role="tablist" aria-label="저장 방식" style="gap:6px">${[['link', '링크'], ['memo', '메모']].map(([k, l]) => `<button type="button" role="tab" aria-selected="${ui.libMode === k}" class="chip ${ui.libMode === k ? 'on' : ''}" style="min-height:36px" data-act="libMode" data-k="${k}">${l}</button>`).join('')}</div>
+    ${ui.libMode === 'memo' ? `<label class="lbl" for="lib-memo">메모</label>
+    <textarea id="lib-memo" name="memo" class="field" rows="4" placeholder="생각, 좋은 문장, 책 구절, 해볼 것… 자유롭게 적어요" required></textarea>
+    <button class="btn" type="submit">메모 저장</button>` : `<label class="lbl" for="lib-url">링크 붙여넣기</label>
     <div class="row" style="gap:8px"><div class="row grow field" style="gap:8px;padding:0 12px">${I.link}<input id="lib-url" name="url" type="url" inputmode="url" placeholder="https://" style="flex:1;min-width:0;border:none;background:none;height:44px;font-size:15px;outline:none" required autocomplete="off"></div>
       <button class="btn" type="submit">저장</button></div>
-    <input name="title" class="field" placeholder="제목 (비우면 주소로 저장)" aria-label="제목" autocomplete="off">
-    <div class="row" style="gap:6px" role="radiogroup" aria-label="분류">${Object.keys(LIB).map((k) => `<button type="button" class="chip" role="radio" aria-checked="${ui.libCat === k}" data-act="libCat" data-k="${k}" style="min-height:36px;color:${LIB[k][1]};border:2px solid ${ui.libCat === k ? LIB[k][1] : 'var(--line)'};background:${ui.libCat === k ? LIB[k][0] : '#fff'}">${k}</button>`).join('')}</div>
+    <input name="title" class="field" placeholder="제목 (비우면 주소로 저장)" aria-label="제목" autocomplete="off">`}
+    <div class="row" style="gap:6px;flex-wrap:wrap" role="radiogroup" aria-label="분류">${Object.keys(LIB).map((k) => `<button type="button" class="chip" role="radio" aria-checked="${ui.libCat === k}" data-act="libCat" data-k="${k}" style="min-height:36px;color:${LIB[k][1]};border:2px solid ${ui.libCat === k ? LIB[k][1] : 'var(--line)'};background:${ui.libCat === k ? LIB[k][0] : '#fff'}">${k}</button>`).join('')}</div>
   </form>
   <div class="row" role="tablist" aria-label="분류 보기" style="gap:8px;flex-wrap:wrap">${['전체', ...Object.keys(LIB)].map((k) => `<button role="tab" aria-selected="${ui.libTab === k}" class="chip ${ui.libTab === k ? 'on' : ''}" data-act="libTab" data-k="${k}">${k} <span style="opacity:.75;font-weight:400">${S.library.filter((x) => k === '전체' || x.cat === k).length}</span></button>`).join('')}</div>
-  ${items.length ? items.map((x) => { const [tint, ink] = LIB[x.cat] || LIB['대화법']; return `<article class="card lib-item ${x.done ? 'done' : ''}" style="flex-direction:row;padding:12px 12px 12px 14px">
-      <button class="check" style="${x.done ? 'background:var(--primary);border-color:var(--primary)' : ''}" data-act="libToggle" data-id="${x.id}" aria-pressed="${x.done}" aria-label="${esc(x.title)} 봤어요">${x.done ? I.check : ''}</button>
-      <span class="lib-icon" style="background:${tint};color:${ink}">${x.video ? I.video : I.doc}</span>
-      <div class="col grow" style="gap:3px"><a class="lib-title" href="${esc(x.url)}" target="_blank" rel="noopener noreferrer">${esc(x.title)}</a>
-        <span class="xs muted row" style="gap:6px"><span class="tag" style="background:${tint};color:${ink}">${x.cat}</span>${esc(x.host)}</span></div>
-      <button class="icon-btn sm" data-act="libMenu" data-id="${x.id}" aria-label="${esc(x.title)} 편집">${I.edit}</button>
-    </article>`; }).join('') : `<div class="card" style="align-items:center;text-align:center">${mascotFor(mascotIndex(), 64)}<span class="muted small">대화법, 연애, 재테크, 자기관리·계발 영상이나 글 링크를 저장해두세요</span></div>`}`;
+  ${items.length ? items.map((x) => { const [tint, ink] = LIB[x.cat] || LIB['대화법']; const memo = x.kind === 'memo'; const label = memo ? x.text.split('\n')[0].slice(0, 30) : x.title; return `<article class="card lib-item ${x.done ? 'done' : ''}" style="flex-direction:row;padding:12px 12px 12px 14px;${memo ? 'align-items:flex-start' : ''}">
+      <button class="check" style="${x.done ? 'background:var(--primary);border-color:var(--primary)' : ''}" data-act="libToggle" data-id="${x.id}" aria-pressed="${x.done}" aria-label="${esc(label)} ${memo ? '완료' : '봤어요'}">${x.done ? I.check : ''}</button>
+      <span class="lib-icon" style="background:${tint};color:${ink}">${memo ? I.edit.replace(/16/g, '22') : x.video ? I.video : I.doc}</span>
+      <div class="col grow" style="gap:3px">${memo ? `<span class="lib-title" style="font-weight:400;white-space:pre-wrap">${esc(x.text)}</span>` : `<a class="lib-title" href="${esc(x.url)}" target="_blank" rel="noopener noreferrer">${esc(x.title)}</a>`}
+        <span class="xs muted row" style="gap:6px"><span class="tag" style="background:${tint};color:${ink}">${x.cat}</span>${memo ? `메모 · ${md(x.at)}` : esc(x.host)}</span></div>
+      <button class="icon-btn sm" data-act="libMenu" data-id="${x.id}" aria-label="${esc(label)} 편집">${I.edit}</button>
+    </article>`; }).join('') : `<div class="card" style="align-items:center;text-align:center">${mascotFor(mascotIndex(), 64)}<span class="muted small">대화법, 연애, 재테크, 자기관리·계발 링크나 메모를 저장해두세요</span></div>`}`;
 }
 
 /* 도전 & 회복 */
@@ -483,6 +488,7 @@ function vChallenge() {
   <section class="card" style="background:var(--peach);box-shadow:none">
     <div class="row"><span class="icon-btn" style="color:var(--primary)">${I.shield}</span><div class="col grow"><b style="font-size:14px;color:#6E2F14">쉬는 날 쿠폰 ${restLeft}/${REST_PER_MONTH}</b><span class="small" style="color:var(--primary-dark)">아픈 날, 여행 가는 날엔 연속 기록을 지켜줘요</span></div></div>
     <button class="btn light" data-act="toggleRest" ${!isRest(t) && restLeft <= 0 ? 'disabled' : ''}>${isRest(t) ? '오늘 쉬는 날 취소하기' : restLeft > 0 ? '오늘 쉬는 날로 쓰기' : '이번 달 쿠폰을 다 썼어요'}</button></section>
+  <button class="card" style="flex-direction:row;align-items:center;border:none;text-align:left;width:100%" data-act="go" data-view="friends">${mascotFor(mascotIndex(), 48)}<span class="col grow"><b style="font-size:14px">매일 바뀌는 친구들</b><span class="small muted">오늘은 ${MASCOTS[mascotIndex()].name} · 내일은 ${MASCOTS[mascotIndex(1)].name}</span></span>${I.right}</button>
   <section class="card" style="background:var(--soft);box-shadow:none;flex-direction:row;align-items:center"><span class="small" style="color:#5C4536">‘내일로’ 미룬 일은 벌점도, 포인트도 없어요</span></section>
   <section class="card"><h2>포인트 기록</h2><div class="ledger">${hist.length ? hist.map((e) => `<div><span>${md(e.d)} · ${esc(e.label)}${e.live ? ' <span class="xs muted">(진행 중)</span>' : ''}</span><b style="color:${e.pts > 0 ? '#3F6B26' : 'var(--bad)'}">${e.pts > 0 ? '+' : ''}${e.pts}P</b></div>`).join('') : '<span class="small muted">아직 기록이 없어요</span>'}</div></section>
   <section class="card" id="backup"><h2>휴대폰 바꿀 때 · 백업</h2><span class="small muted" style="line-height:1.6">기록은 이 폰에만 저장돼요. <b>예전 폰</b>에서 ‘백업 파일 저장’으로 파일을 카톡·드라이브·파일 앱에 보관하고, <b>새 폰</b>에서 ‘백업 불러오기’로 그 파일을 고르면 그대로 옮겨져요. 사진·영상·프로필 사진도 함께 옮겨져요.</span>
@@ -525,7 +531,7 @@ function habitSheet(h) {
   <form data-form="habit" data-id="${h ? h.id : ''}" class="col" style="gap:10px">
     <label class="lbl" for="h-name">습관 이름</label><input id="h-name" name="name" class="field" value="${h ? esc(h.name) : ''}" placeholder="예: 물 2L 마시기" required autocomplete="off">
     <span class="lbl">영역</span><div class="cats" role="radiogroup" aria-label="영역">${CAT_KEYS.map((k) => catOpt(k, sheetCat === k, 'sheetCat')).join('')}</div>
-    <span class="small muted">매일 오늘 할 일의 진·선·미·일 배너에 자동으로 들어가요</span>
+    <span class="small muted">매일 오늘 할 일의 진·선·미·일·기타 배너에 자동으로 들어가요</span>
     <button class="btn" type="submit">${h ? '저장' : '만들기'}</button>
   </form>`);
 }
@@ -559,7 +565,8 @@ const actions = {
   libCat: (el) => { ui.libCat = el.dataset.k; render(); },
   libTab: (el) => { ui.libTab = el.dataset.k; render(); },
   libToggle: (el) => { const x = S.library.find((y) => y.id === el.dataset.id); if (x) { x.done = !x.done; save(); render(); } },
-  libMenu: (el) => { const x = S.library.find((y) => y.id === el.dataset.id); if (!x) return; sheet(`<h2>링크 고치기</h2><form data-form="libEdit" data-id="${x.id}" class="col" style="gap:10px"><label class="lbl" for="l-title">제목</label><input id="l-title" name="title" class="field" value="${esc(x.title)}" required><label class="lbl" for="l-cat">분류</label><select id="l-cat" name="cat" class="field">${Object.keys(LIB).map((k) => `<option ${k === x.cat ? 'selected' : ''}>${k}</option>`).join('')}</select><button class="btn" type="submit">저장</button><button class="btn danger" type="button" data-act="libDel" data-id="${x.id}">삭제</button></form>`); },
+  libMenu: (el) => { const x = S.library.find((y) => y.id === el.dataset.id); if (!x) return; const memo = x.kind === 'memo'; sheet(`<h2>${memo ? '메모 고치기' : '링크 고치기'}</h2><form data-form="libEdit" data-id="${x.id}" class="col" style="gap:10px">${memo ? `<label class="lbl" for="l-text">메모</label><textarea id="l-text" name="text" class="field" rows="6" required>${esc(x.text)}</textarea>` : `<label class="lbl" for="l-title">제목</label><input id="l-title" name="title" class="field" value="${esc(x.title)}" required>`}<label class="lbl" for="l-cat">분류</label><select id="l-cat" name="cat" class="field">${Object.keys(LIB).map((k) => `<option ${k === x.cat ? 'selected' : ''}>${k}</option>`).join('')}</select><button class="btn" type="submit">저장</button><button class="btn danger" type="button" data-act="libDel" data-id="${x.id}">삭제</button></form>`); },
+  libMode: (el) => { ui.libMode = el.dataset.k; render(); },
   libDel: (el) => { S.library = S.library.filter((y) => y.id !== el.dataset.id); save(); closeSheet(); render(); },
   mood: (el) => { const d = diaryOf(today()); d.mood = d.mood === el.dataset.mood ? '' : el.dataset.mood; save(); render(); },
   pickProfile: () => document.getElementById('profile-input').click(),
@@ -616,6 +623,10 @@ document.addEventListener('submit', (ev) => {
     if (f.dataset.id) { const h = S.habits.find((y) => y.id === f.dataset.id); if (h) Object.assign(h, { name, cat: sheetCat }); }
     else S.habits.push({ id: uid(), name, cat: sheetCat, createdAt: today() });
     save(); closeSheet(); render();
+  } else if (kind === 'libAdd' && ui.libMode === 'memo') {
+    const text = String(fd.get('memo') || '').trim(); if (!text) return;
+    S.library.unshift({ id: uid(), kind: 'memo', text, cat: ui.libCat, done: false, at: today() });
+    save(); render(); flash('메모를 저장했어요');
   } else if (kind === 'libAdd') {
     let url = v('url'); if (!url) return; if (!/^https?:\/\//i.test(url)) url = 'https://' + url;
     let host = url; try { host = new URL(url).hostname.replace(/^www\./, ''); } catch (e) { /* 주소 그대로 */ }
@@ -623,7 +634,7 @@ document.addEventListener('submit', (ev) => {
     S.library.unshift({ id: uid(), url, host, title: v('title') || host, cat: ui.libCat, video, done: false, at: today() });
     save(); render(); flash('보관함에 저장했어요');
   } else if (kind === 'libEdit') {
-    const x = S.library.find((y) => y.id === f.dataset.id); if (x) { x.title = v('title') || x.title; x.cat = v('cat') || x.cat; }
+    const x = S.library.find((y) => y.id === f.dataset.id); if (x) { if (x.kind === 'memo') x.text = String(fd.get('text') || '').trim() || x.text; else x.title = v('title') || x.title; x.cat = v('cat') || x.cat; }
     save(); closeSheet(); render();
   }
 });
