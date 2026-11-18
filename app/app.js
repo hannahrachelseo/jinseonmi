@@ -1,14 +1,15 @@
-// Hannah's ToDo — 진·선·미 투두 & 습관 · Crafted By. Hannah T
+// Hannah's ToDo — 진·선·미·일 투두 & 습관 · Crafted By. Hannah T
 import { MASCOTS } from './mascots.js';
 
 /* ---------- 기본 상수 ---------- */
 const CATS = {
-  jin:  { ko: '진', han: '眞', sub: '배움 · 일 · 성장',   tint: '#DCEBF2', strong: '#3E7FA3', ink: '#245E80', bar: '#7FB7D6', light: '#A9D3EA' },
+  jin:  { ko: '진', han: '眞', sub: '배움 · 공부 · 성장',   tint: '#DCEBF2', strong: '#3E7FA3', ink: '#245E80', bar: '#7FB7D6', light: '#A9D3EA' },
   seon: { ko: '선', han: '善', sub: '관계 · 마음 · 나눔', tint: '#E3EED9', strong: '#5E8C3F', ink: '#3F6B26', bar: '#9CC77A', light: '#C3E0A6' },
   mi:   { ko: '미', han: '美', sub: '건강 · 몸 · 자기관리', tint: '#FFE1DA', strong: '#D9645A', ink: '#A63F37', bar: '#F08C80', light: '#F7B8AE' },
+  il:   { ko: '일', han: '業', sub: '업무 · 커리어 · 돈',   tint: '#EAE3F2', strong: '#7E5BA6', ink: '#5B3D80', bar: '#B49AD6', light: '#CDBAE6' },
 };
-const CAT_KEYS = ['jin', 'seon', 'mi'];
-const LIB = { '대화법': ['#FCE3D3', '#9C4A2A'], '연애': ['#FFE9DA', '#8F3F0A'], '재테크': ['#FFF4CC', '#7A5600'] };
+const CAT_KEYS = ['jin', 'seon', 'mi', 'il'];
+const LIB = { '대화법': ['#FCE3D3', '#9C4A2A'], '연애': ['#FFE9DA', '#8F3F0A'], '재테크': ['#FFF4CC', '#7A5600'], '자기관리·계발': ['#E3EED9', '#3F6B26'] };
 const MOODS = ['최고', '좋음', '보통', '지침'];
 const WK = ['일', '월', '화', '수', '목', '금', '토'];
 const PTS = { full: 30, streak7: 100, miss3: -50, recover: 25 };
@@ -456,7 +457,7 @@ function vLibrary() {
       <div class="col grow" style="gap:3px"><a class="lib-title" href="${esc(x.url)}" target="_blank" rel="noopener noreferrer">${esc(x.title)}</a>
         <span class="xs muted row" style="gap:6px"><span class="tag" style="background:${tint};color:${ink}">${x.cat}</span>${esc(x.host)}</span></div>
       <button class="icon-btn sm" data-act="libMenu" data-id="${x.id}" aria-label="${esc(x.title)} 편집">${I.edit}</button>
-    </article>`; }).join('') : `<div class="card" style="align-items:center;text-align:center">${mascotFor(mascotIndex(), 64)}<span class="muted small">대화법, 연애, 재테크 영상이나 글 링크를 저장해두세요</span></div>`}`;
+    </article>`; }).join('') : `<div class="card" style="align-items:center;text-align:center">${mascotFor(mascotIndex(), 64)}<span class="muted small">대화법, 연애, 재테크, 자기관리·계발 영상이나 글 링크를 저장해두세요</span></div>`}`;
 }
 
 /* 도전 & 회복 */
@@ -524,7 +525,7 @@ function habitSheet(h) {
   <form data-form="habit" data-id="${h ? h.id : ''}" class="col" style="gap:10px">
     <label class="lbl" for="h-name">습관 이름</label><input id="h-name" name="name" class="field" value="${h ? esc(h.name) : ''}" placeholder="예: 물 2L 마시기" required autocomplete="off">
     <span class="lbl">영역</span><div class="cats" role="radiogroup" aria-label="영역">${CAT_KEYS.map((k) => catOpt(k, sheetCat === k, 'sheetCat')).join('')}</div>
-    <span class="small muted">매일 오늘 할 일의 ${'진·선·미'} 배너에 자동으로 들어가요</span>
+    <span class="small muted">매일 오늘 할 일의 진·선·미·일 배너에 자동으로 들어가요</span>
     <button class="btn" type="submit">${h ? '저장' : '만들기'}</button>
   </form>`);
 }

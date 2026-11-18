@@ -1,7 +1,7 @@
 {
   "name": "Hannah's ToDo",
   "short_name": "Hannah's ToDo",
-  "description": "진·선·미로 나누는 오늘 할 일과 습관 만들기",
+  "description": "진·선·미·일로 나누는 오늘 할 일과 습관 만들기",
   "lang": "ko",
   "start_url": "./",
   "scope": "./",
