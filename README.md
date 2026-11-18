@@ -19,6 +19,10 @@
 모든 기록과 사진은 **이 기기 브라우저 안에만** 저장돼요. 서버로 보내지 않아요.
 폰을 바꿀 땐 ‘도전 & 회복’ 화면 맨 아래 **백업 파일 저장 → 새 폰에서 백업 불러오기**를 쓰세요. 사진·영상도 함께 옮겨져요.
 
+## 안드로이드 APK
+`main`에 푸시하면 GitHub Actions가 APK를 만들어 Releases에 올려요.
+항상 최신 파일: https://github.com/hannahrachelseo/jinseonmi/releases/latest/download/HannahsToDo.apk
+
 ## 자동 배포
 `main`에 푸시하면 GitHub Actions가 `app/` 폴더를 GitHub Pages에 올려요.
 처음 한 번만: 저장소 **Settings → Pages → Source** 를 **GitHub Actions** 로 바꿔주세요.

@@ -1,0 +1,90 @@
+name: 안드로이드 APK 만들기
+
+on:
+  push:
+    branches: [main]
+    paths: ['app/**', '.github/workflows/apk.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: apk
+  cancel-in-progress: true
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: 앱을 안드로이드 프로젝트로 감싸기 (Capacitor)
+        run: |
+          mkdir -p build-apk && cd build-apk
+          npm init -y >/dev/null
+          npm install @capacitor/core@6 @capacitor/cli@6 @capacitor/android@6
+          cp -r ../app www
+          sed -i "s/__BUILD__/${GITHUB_SHA::7}/" www/sw.js
+          cat > capacitor.config.json <<'EOF'
+          {
+            "appId": "com.hannahrachelseo.hannahstodo",
+            "appName": "Hannah's ToDo",
+            "webDir": "www",
+            "android": { "backgroundColor": "#FBF3E6" }
+          }
+          EOF
+          npx cap add android
+          npx cap sync android
+
+      - name: 앱 이름 · 아이콘 넣기
+        working-directory: build-apk/android/app/src/main/res
+        run: |
+          cat > values/strings.xml <<'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <resources>
+              <string name="app_name">Hannah\'s ToDo</string>
+              <string name="title_activity_main">Hannah\'s ToDo</string>
+              <string name="package_name">com.hannahrachelseo.hannahstodo</string>
+              <string name="custom_url_scheme">com.hannahrachelseo.hannahstodo</string>
+          </resources>
+          EOF
+          rm -rf mipmap-anydpi-v26
+          for d in mipmap-*; do
+            cp ../../../../../www/icons/icon-192.png "$d/ic_launcher.png"
+            cp ../../../../../www/icons/icon-192.png "$d/ic_launcher_round.png"
+            rm -f "$d/ic_launcher_foreground.png"
+          done
+
+      - name: APK 빌드
+        working-directory: build-apk/android
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleDebug --no-daemon
+          cp app/build/outputs/apk/debug/app-debug.apk ../../HannahsToDo.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: HannahsToDo-apk
+          path: HannahsToDo.apk
+
+      - name: 다운로드 페이지(Releases)에 올리기
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: apk-${{ github.run_number }}
+          name: "Hannah's ToDo 안드로이드 앱 #${{ github.run_number }}"
+          body: |
+            안드로이드 폰에서 아래 HannahsToDo.apk 를 눌러 다운로드 → 설치하세요.
+            (처음이면 '출처를 알 수 없는 앱 설치'를 허용해야 해요)
+            항상 최신 파일 주소: https://github.com/${{ github.repository }}/releases/latest/download/HannahsToDo.apk
+          files: HannahsToDo.apk
+          make_latest: true
