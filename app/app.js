@@ -1,4 +1,4 @@
-// 진선미 · 투두 & 습관 — Crafted By. Hannah T
+// Hannah's ToDo — 진·선·미 투두 & 습관 · Crafted By. Hannah T
 import { MASCOTS } from './mascots.js';
 
 /* ---------- 기본 상수 ---------- */
@@ -253,7 +253,7 @@ function vToday() {
   return `
   <header class="top">
     <div class="row" style="gap:12px">${avatar}
-      <div class="col"><span class="small muted">${longDate(t)}</span><h1>한나의 진·선·미</h1></div>
+      <div class="col"><span class="small muted">${longDate(t)}</span><h1>Hannah's ToDo</h1></div>
     </div>
     <div class="col" style="align-items:center">
       <button class="mascot-btn" data-act="go" data-view="friends" aria-label="오늘의 친구 ${m.name} 보기">${mascotFor(mi, 64)}</button>
@@ -484,8 +484,8 @@ function vChallenge() {
     <button class="btn light" data-act="toggleRest" ${!isRest(t) && restLeft <= 0 ? 'disabled' : ''}>${isRest(t) ? '오늘 쉬는 날 취소하기' : restLeft > 0 ? '오늘 쉬는 날로 쓰기' : '이번 달 쿠폰을 다 썼어요'}</button></section>
   <section class="card" style="background:var(--soft);box-shadow:none;flex-direction:row;align-items:center"><span class="small" style="color:#5C4536">‘내일로’ 미룬 일은 벌점도, 포인트도 없어요</span></section>
   <section class="card"><h2>포인트 기록</h2><div class="ledger">${hist.length ? hist.map((e) => `<div><span>${md(e.d)} · ${esc(e.label)}${e.live ? ' <span class="xs muted">(진행 중)</span>' : ''}</span><b style="color:${e.pts > 0 ? '#3F6B26' : 'var(--bad)'}">${e.pts > 0 ? '+' : ''}${e.pts}P</b></div>`).join('') : '<span class="small muted">아직 기록이 없어요</span>'}</div></section>
-  <section class="card"><h2>백업</h2><span class="small muted">기록은 이 폰에만 저장돼요. 폰을 바꿀 때 백업 파일로 옮기세요. (사진·영상은 포함되지 않아요)</span>
-    <div class="row" style="gap:8px"><button class="btn ghost grow" data-act="exportData">백업 파일 저장</button><button class="btn ghost grow" data-act="importData">백업 불러오기</button></div></section>`;
+  <section class="card" id="backup"><h2>휴대폰 바꿀 때 · 백업</h2><span class="small muted" style="line-height:1.6">기록은 이 폰에만 저장돼요. <b>예전 폰</b>에서 ‘백업 파일 저장’으로 파일을 카톡·드라이브·파일 앱에 보관하고, <b>새 폰</b>에서 ‘백업 불러오기’로 그 파일을 고르면 그대로 옮겨져요. 사진·영상·프로필 사진도 함께 옮겨져요.</span>
+    <div class="row" style="gap:8px"><button class="btn ghost grow" data-act="exportData">백업 파일 저장</button><button class="btn ghost grow" data-act="importData">백업 불러오기</button></div>${S.lastBackup ? `<span class="xs muted">마지막 백업: ${md(S.lastBackup)}</span>` : ''}</section>`;
 }
 
 /* 친구들 */
@@ -566,7 +566,22 @@ const actions = {
   viewMedia: (el) => { const d = diaryOf(today()); const m = d.media.find((x) => x.id === el.dataset.id); if (!m) return; const u = urls['m:' + m.id]; sheet(`<div class="viewer">${m.type === 'video' ? `<video src="${u}" controls playsinline></video>` : `<img src="${u}" alt="첨부한 사진">`}</div><div class="row" style="gap:8px"><button class="btn ghost grow" data-act="closeSheet">닫기</button><button class="btn danger grow" data-act="delMedia" data-id="${m.id}">삭제</button></div>`); },
   delMedia: async (el) => { const d = diaryOf(today()); d.media = d.media.filter((x) => x.id !== el.dataset.id); save(); closeSheet(); render(); try { await idb.del('m:' + el.dataset.id); } catch (e) { /* 무시 */ } },
   toggleRest: () => { const t = today(); if (isRest(t)) delete S.restDays[t]; else if (restUsedThisMonth() < REST_PER_MONTH) S.restDays[t] = true; save(); render(); },
-  exportData: () => { const blob = new Blob([JSON.stringify(S, null, 1)], { type: 'application/json' }); const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `jinseonmi-backup-${today()}.json`; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 2000); },
+  exportData: async () => {
+    flash('백업 파일을 만드는 중이에요');
+    const media = {};
+    const keys = ['profile', ...Object.values(S.diary).flatMap((d) => (d.media || []).map((m) => 'm:' + m.id))];
+    for (const k of keys) { try { const b = await idb.get(k); if (b) media[k] = await toDataUrl(b); } catch (e) { /* 없는 파일은 건너뜀 */ } }
+    S.lastBackup = today(); save();
+    const name = `hannahs-todo-backup-${today()}.json`;
+    const blob = new Blob([JSON.stringify({ ...S, _media: media })], { type: 'application/json' });
+    try { // 폰에서는 공유 창으로 카톡·드라이브·파일 앱에 바로 저장
+      const file = new File([blob], name, { type: 'application/json' });
+      if (matchMedia('(pointer: coarse)').matches && navigator.canShare && navigator.canShare({ files: [file] })) { await navigator.share({ files: [file], title: "Hannah's ToDo 백업" }); flash('백업 파일을 저장했어요'); return; }
+    } catch (e) { if (e && e.name === 'AbortError') { render(); return; } }
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name;
+    document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+    flash('백업 파일을 저장했어요');
+  },
   importData: () => document.getElementById('backup-input').click(),
   closeSheet: (el, ev) => { if (ev.target === el) closeSheet(); },
 };
@@ -630,7 +645,12 @@ document.getElementById('media-input').addEventListener('change', async (ev) => 
 });
 document.getElementById('backup-input').addEventListener('change', async (ev) => {
   const file = ev.target.files[0]; ev.target.value = ''; if (!file) return;
-  try { const data = JSON.parse(await file.text()); if (!data || !Array.isArray(data.habits) || !Array.isArray(data.tasks)) throw new Error('bad'); S = Object.assign(fresh(), data); save(); settle(); render(); flash('백업을 불러왔어요'); } catch (e) { flash('백업 파일을 읽지 못했어요'); }
+  try {
+    const data = JSON.parse(await file.text()); if (!data || !Array.isArray(data.habits) || !Array.isArray(data.tasks)) throw new Error('bad');
+    const media = data._media || {}; delete data._media;
+    for (const [k, u] of Object.entries(media)) { try { const b = await (await fetch(u)).blob(); await idb.set(k, b); if (urls[k]) URL.revokeObjectURL(urls[k]); delete urls[k]; delete loading[k]; } catch (e) { /* 손상된 파일은 건너뜀 */ } }
+    S = Object.assign(fresh(), data); save(); persist(); settle(); render(); flash('백업을 불러왔어요');
+  } catch (e) { flash('백업 파일을 읽지 못했어요'); }
 });
 function shrink(file, max) {
   return new Promise((res) => {
@@ -646,6 +666,7 @@ function shrink(file, max) {
     img.src = u;
   });
 }
+function toDataUrl(blob) { return new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = () => rej(r.error); r.readAsDataURL(blob); }); }
 function persist() { try { navigator.storage && navigator.storage.persist && navigator.storage.persist(); } catch (e) { /* 미지원 */ } }
 
 /* 날짜가 바뀌면(자정·오전 7시) 자동 정산·새로고침 */

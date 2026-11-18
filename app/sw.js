@@ -1,5 +1,5 @@
 // 오프라인에서도 열리도록 앱 파일을 저장해둬요. 배포할 때마다 버전이 바뀌어요.
-const VERSION = 'jinseonmi-__BUILD__';
+const VERSION = 'hannahs-todo-__BUILD__';
 const SHELL = ['./', './index.html', './styles.css', './app.js', './mascots.js', './manifest.webmanifest', './icons/icon-192.png', './icons/icon-512.png'];
 
 self.addEventListener('install', (e) => {
