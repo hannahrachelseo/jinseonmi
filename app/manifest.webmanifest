@@ -1,0 +1,16 @@
+{
+  "name": "진선미 · 투두 & 습관",
+  "short_name": "진선미",
+  "description": "진·선·미로 나누는 오늘 할 일과 습관 만들기",
+  "lang": "ko",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#FBF3E6",
+  "theme_color": "#FBF3E6",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

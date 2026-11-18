@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#FBF3E6">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="진선미">
+<title>진선미 · 투두 & 습관</title>
+<link rel="manifest" href="./manifest.webmanifest">
+<link rel="icon" href="./icons/icon-192.png">
+<link rel="apple-touch-icon" href="./icons/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Gaegu:wght@400;700&family=Gowun+Dodum&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+<main id="app" aria-live="polite"></main>
+<nav id="nav" aria-label="하단 메뉴"></nav>
+<div id="sheet-root"></div>
+<input type="file" id="profile-input" accept="image/*" hidden>
+<input type="file" id="media-input" accept="image/*,video/*" multiple hidden>
+<input type="file" id="backup-input" accept="application/json,.json" hidden>
+<script type="module" src="./app.js"></script>
+</body>
+</html>
