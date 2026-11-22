@@ -290,6 +290,7 @@ function vToday() {
 
   ${lv.full ? `<div class="celebrate">${mascotFor(mi, 52)}<div class="col grow"><span class="hand" style="font-size:22px;color:var(--gold-dark)">오늘 목표 100% 달성!</span><span class="small" style="color:var(--gold)">+${PTS.full}P가 쌓였어요 · ${esc(m.name)}도 신났어요</span></div></div>` : ''}
   ${rest ? `<div class="toast"><span>오늘은 쉬는 날이에요. 습관 연속 기록이 지켜져요</span><button class="mini" data-act="toggleRest">취소</button></div>` : ''}
+  ${(() => { const has = S.habits.length + S.tasks.length + S.library.length > 0; const last = S.lastBackup; const days = last ? Math.round((parse(today()) - parse(last)) / 864e5) : null; return has && (days === null || days >= 7) ? `<div class="toast" style="background:var(--gold-bg);border:none"><span>${days === null ? '아직 백업을 안 했어요' : `백업한 지 ${days}일 됐어요`} · 앱을 새로 설치하기 전엔 꼭 백업!</span><button class="mini" style="background:#fff;color:var(--gold)" data-act="go" data-view="challenge">백업하기</button></div>` : ''; })()}
   ${ui.undo ? `<div class="toast"><span>‘${esc(ui.undo.title)}’ → 내일로 옮겼어요</span><button class="mini" style="background:var(--peach);color:var(--primary)" data-act="undoPostpone">되돌리기</button></div>` : ''}
 
   ${CAT_KEYS.map((k) => { const c = CATS[k]; return `

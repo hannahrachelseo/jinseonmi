@@ -3,7 +3,7 @@ name: 안드로이드 APK 만들기
 on:
   push:
     branches: [main]
-    paths: ['app/**', '.github/workflows/apk.yml']
+    paths: ['app/**', '.github/workflows/apk.yml', '.github/android/**']
   workflow_dispatch:
 
 permissions:
@@ -27,6 +27,17 @@ jobs:
         with:
           distribution: temurin
           java-version: 17
+
+      - name: 서명 키 준비 (항상 같은 키로 서명해야 업데이트해도 기록이 남아요)
+        env:
+          ANDROID_KEYSTORE: ${{ secrets.ANDROID_KEYSTORE }}
+        run: |
+          if [ -z "$ANDROID_KEYSTORE" ]; then
+            echo "::error::ANDROID_KEYSTORE 시크릿이 없어요. Settings → Secrets and variables → Actions 에 추가해주세요."
+            exit 1
+          fi
+          mkdir -p ~/.android
+          echo "$ANDROID_KEYSTORE" | base64 -d > ~/.android/debug.keystore
 
       - name: 앱을 안드로이드 프로젝트로 감싸기 (Capacitor)
         run: |
@@ -65,9 +76,16 @@ jobs:
             rm -f "$d/ic_launcher_foreground.png"
           done
 
+      - name: 항상 같은 서명 키 쓰기 (업데이트해도 기록이 지워지지 않도록)
+        run: |
+          mkdir -p ~/.android
+          cp .github/android/debug.keystore ~/.android/debug.keystore
+
       - name: APK 빌드
         working-directory: build-apk/android
         run: |
+          sed -i "s/versionCode 1$/versionCode ${{ github.run_number }}/; s/versionName \"1.0\"/versionName \"1.${{ github.run_number }}\"/" app/build.gradle
+          grep -n "versionCode\|versionName" app/build.gradle
           chmod +x gradlew
           ./gradlew assembleDebug --no-daemon
           cp app/build/outputs/apk/debug/app-debug.apk ../../HannahsToDo.apk
