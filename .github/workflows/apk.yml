@@ -32,7 +32,7 @@ jobs:
         run: |
           mkdir -p build-apk && cd build-apk
           npm init -y >/dev/null
-          npm install @capacitor/core@6 @capacitor/cli@6 @capacitor/android@6
+          npm install @capacitor/core@6 @capacitor/cli@6 @capacitor/android@6 @capacitor/filesystem@6
           cp -r ../app www
           sed -i "s/__BUILD__/${GITHUB_SHA::7}/" www/sw.js
           cat > capacitor.config.json <<'EOF'
@@ -59,6 +59,9 @@ jobs:
           </resources>
           EOF
           rm -rf mipmap-anydpi-v26
+          # 안드로이드 10 이하에서도 ‘문서’ 폴더에 자동 백업을 쓸 수 있도록
+          sed -i 's#<application#<uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="29" />\n    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />\n    <application android:requestLegacyExternalStorage="true"#' ../AndroidManifest.xml
+          grep -n "permission\|<application" ../AndroidManifest.xml
           for d in mipmap-*; do
             cp ../../../../../www/icons/icon-192.png "$d/ic_launcher.png"
             cp ../../../../../www/icons/icon-192.png "$d/ic_launcher_round.png"

@@ -291,6 +291,7 @@ function vToday() {
   ${lv.full ? `<div class="celebrate">${mascotFor(mi, 52)}<div class="col grow"><span class="hand" style="font-size:22px;color:var(--gold-dark)">오늘 목표 100% 달성!</span><span class="small" style="color:var(--gold)">+${PTS.full}P가 쌓였어요 · ${esc(m.name)}도 신났어요</span></div></div>` : ''}
   ${rest ? `<div class="toast"><span>오늘은 쉬는 날이에요. 습관 연속 기록이 지켜져요</span><button class="mini" data-act="toggleRest">취소</button></div>` : ''}
   ${(() => { const has = S.habits.length + S.tasks.length + S.library.length > 0; const last = S.lastBackup; const days = last ? Math.round((parse(today()) - parse(last)) / 864e5) : null; return has && (days === null || days >= 7) ? `<div class="toast" style="background:var(--gold-bg);border:none"><span>${days === null ? '아직 백업을 안 했어요' : `백업한 지 ${days}일 됐어요`} · 앱을 새로 설치하기 전엔 꼭 백업!</span><button class="mini" style="background:#fff;color:var(--gold)" data-act="go" data-view="challenge">백업하기</button></div>` : ''; })()}
+  ${!hasData() && !localStorage.getItem('hannahstodo.restoreHide') ? `<div class="card" style="background:var(--peach);box-shadow:none"><b style="font-size:15px;color:#6E2F14">앱을 새로 설치했나요?</b><span class="small" style="color:var(--primary-dark);line-height:1.6">예전 기록을 그대로 불러올 수 있어요. ${NATIVE ? '<b>내 파일 → 문서(Documents) → HannahsToDo</b> 폴더에서 가장 최근 파일을 골라주세요.' : '저장해둔 백업 파일을 골라주세요.'}</span><div class="row" style="gap:8px"><button class="btn grow" data-act="importData">기록 불러오기</button><button class="btn ghost" data-act="hideRestore">처음이에요</button></div></div>` : ''}
   ${ui.undo ? `<div class="toast"><span>‘${esc(ui.undo.title)}’ → 내일로 옮겼어요</span><button class="mini" style="background:var(--peach);color:var(--primary)" data-act="undoPostpone">되돌리기</button></div>` : ''}
 
   ${CAT_KEYS.map((k) => { const c = CATS[k]; return `
@@ -591,25 +592,62 @@ const actions = {
   viewMedia: (el) => { const d = diaryOf(today()); const m = d.media.find((x) => x.id === el.dataset.id); if (!m) return; const u = urls['m:' + m.id]; sheet(`<div class="viewer">${m.type === 'video' ? `<video src="${u}" controls playsinline></video>` : `<img src="${u}" alt="첨부한 사진">`}</div><div class="row" style="gap:8px"><button class="btn ghost grow" data-act="closeSheet">닫기</button><button class="btn danger grow" data-act="delMedia" data-id="${m.id}">삭제</button></div>`); },
   delMedia: async (el) => { const d = diaryOf(today()); d.media = d.media.filter((x) => x.id !== el.dataset.id); save(); closeSheet(); render(); try { await idb.del('m:' + el.dataset.id); } catch (e) { /* 무시 */ } },
   toggleRest: () => { const t = today(); if (isRest(t)) delete S.restDays[t]; else if (restUsedThisMonth() < REST_PER_MONTH) S.restDays[t] = true; save(); render(); },
-  exportData: async () => {
-    flash('백업 파일을 만드는 중이에요');
-    const media = {};
-    const keys = ['profile', ...Object.values(S.diary).flatMap((d) => (d.media || []).map((m) => 'm:' + m.id))];
-    for (const k of keys) { try { const b = await idb.get(k); if (b) media[k] = await toDataUrl(b); } catch (e) { /* 없는 파일은 건너뜀 */ } }
-    S.lastBackup = today(); save();
-    const name = `hannahs-todo-backup-${today()}.json`;
-    const blob = new Blob([JSON.stringify({ ...S, _media: media })], { type: 'application/json' });
-    try { // 폰에서는 공유 창으로 카톡·드라이브·파일 앱에 바로 저장
-      const file = new File([blob], name, { type: 'application/json' });
-      if (matchMedia('(pointer: coarse)').matches && navigator.canShare && navigator.canShare({ files: [file] })) { await navigator.share({ files: [file], title: "Hannah's ToDo 백업" }); flash('백업 파일을 저장했어요'); return; }
-    } catch (e) { if (e && e.name === 'AbortError') { render(); return; } }
-    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name;
-    document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 4000);
-    flash('백업 파일을 저장했어요');
-  },
+  exportData: () => exportBackup(),
   importData: () => document.getElementById('backup-input').click(),
+  hideRestore: () => { localStorage.setItem('hannahstodo.restoreHide', '1'); render(); },
   closeSheet: (el, ev) => { if (ev.target === el) closeSheet(); },
 };
+/* ---------- 백업 (안드로이드 앱은 폰의 ‘문서’ 폴더에 자동 저장 → 앱을 지워도 남아요) ---------- */
+const CAP = window.Capacitor;
+const NATIVE = !!(CAP && CAP.isNativePlatform && CAP.isNativePlatform());
+const FS = NATIVE && CAP.Plugins ? CAP.Plugins.Filesystem : null;
+const hasData = () => S.habits.length + S.tasks.length + S.library.length + Object.keys(S.diary).length > 0;
+function installId() {
+  let id = localStorage.getItem('hannahstodo.install');
+  if (!id) { id = Date.now().toString(36); localStorage.setItem('hannahstodo.install', id); }
+  return id;
+}
+async function backupText(maxBytes = Infinity) {
+  const media = {}; let size = 0;
+  const keys = ['profile', ...Object.values(S.diary).flatMap((d) => (d.media || []).map((m) => 'm:' + m.id))];
+  for (const k of keys) {
+    try { const b = await idb.get(k); if (b && size + b.size <= maxBytes) { media[k] = await toDataUrl(b); size += b.size; } } catch (e) { /* 없는 파일은 건너뜀 */ }
+  }
+  return JSON.stringify({ ...S, _media: media });
+}
+async function writeDocs(name, text) {
+  await FS.writeFile({ path: 'HannahsToDo/' + name, data: text, directory: 'DOCUMENTS', encoding: 'utf8', recursive: true });
+}
+let autoBusy = false;
+async function autoBackup(minGapMin = 10) {
+  if (!FS || autoBusy || !hasData()) return;
+  const last = Number(localStorage.getItem('hannahstodo.autoAt') || 0);
+  if (Date.now() - last < minGapMin * 60e3) return;
+  autoBusy = true;
+  try {
+    await writeDocs(`HannahsToDo-autobackup-${installId()}.json`, await backupText(25e6));
+    localStorage.setItem('hannahstodo.autoAt', String(Date.now()));
+    S.lastBackup = today(); save();
+  } catch (e) { console.warn('자동 백업 실패', e); } finally { autoBusy = false; }
+}
+async function exportBackup() {
+  flash('백업 파일을 만드는 중이에요');
+  const text = await backupText();
+  S.lastBackup = today(); save();
+  const name = `hannahs-todo-backup-${today()}.json`;
+  if (FS) {
+    try { await writeDocs(name, text); flash('내 파일 → 문서(Documents) → HannahsToDo 폴더에 저장했어요'); render(); return; } catch (e) { /* 아래 방법으로 */ }
+  }
+  const blob = new Blob([text], { type: 'application/json' });
+  try { // 폰에서는 공유 창으로 카톡·드라이브·파일 앱에 바로 저장
+    const file = new File([blob], name, { type: 'application/json' });
+    if (matchMedia('(pointer: coarse)').matches && navigator.canShare && navigator.canShare({ files: [file] })) { await navigator.share({ files: [file], title: "Hannah's ToDo 백업" }); flash('백업 파일을 저장했어요'); render(); return; }
+  } catch (e) { if (e && e.name === 'AbortError') { render(); return; } }
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name;
+  document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+  flash('백업 파일을 저장했어요'); render();
+}
+
 function afterCheck(wasFull) {
   render();
   if (!wasFull && live().full) flash(`오늘 목표 100%! +${PTS.full}P`);
@@ -700,8 +738,9 @@ function persist() { try { navigator.storage && navigator.storage.persist && nav
 
 /* 날짜가 바뀌면(자정·오전 7시) 자동 정산·새로고침 */
 let lastDay = today(), lastMascot = mascotIndex();
-function rollover() { lastDay = today(); lastMascot = mascotIndex(); ui.calSel = today(); const n = cleanupExpired(); settle(); render(); if (n) flash(`어제 못 한 일 ${n}개를 정리했어요`); }
+function rollover() { autoBackup(0); lastDay = today(); lastMascot = mascotIndex(); ui.calSel = today(); const n = cleanupExpired(); settle(); render(); if (n) flash(`어제 못 한 일 ${n}개를 정리했어요`); }
 setInterval(() => { if (today() !== lastDay || mascotIndex() !== lastMascot) rollover(); }, 30000);
+document.addEventListener('visibilitychange', () => { if (document.hidden) autoBackup(5); });
 document.addEventListener('visibilitychange', () => { if (!document.hidden && (today() !== lastDay || mascotIndex() !== lastMascot)) rollover(); });
 window.addEventListener('hashchange', () => { const v = location.hash.slice(1); if (v && v !== ui.view) { ui.view = v; render(); } });
 
@@ -709,4 +748,6 @@ const cleaned = cleanupExpired();
 settle();
 render();
 if (cleaned) flash(`어제 못 한 일 ${cleaned}개를 정리했어요`);
+setTimeout(() => autoBackup(60), 4000);
+setInterval(() => autoBackup(30), 15 * 60e3);
 if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('./sw.js').catch(() => {});
