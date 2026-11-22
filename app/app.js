@@ -34,7 +34,7 @@ const mascotFor = (i, size) => `<svg width="${size}" height="${size}" viewBox="0
 /* ---------- 저장 ---------- */
 const fresh = () => ({
   v: 1, createdAt: today(), seq: 1,
-  habits: [], tasks: [], habitLog: {}, restDays: {}, ledger: {}, missions: {}, lastSettled: null,
+  habits: [], tasks: [], habitLog: {}, restDays: {}, ledger: {}, missions: {}, lastSettled: null, dropped: {},
   library: [], diary: {},
 });
 let S = load();
@@ -82,7 +82,22 @@ function dayRate(d) {
   const hs = isRest(d) ? [] : habitsOn(d);
   const ts = tasksOn(d);
   const done = hs.filter((h) => isDone(h.id, d)).length + ts.filter((t) => t.done).length;
-  return { done, total: hs.length + ts.length };
+  const gone = Object.values((S.dropped || {})[d] || {}).reduce((a, b) => a + b, 0); // 자동 정리된 못 한 일도 성취율에 반영
+  return { done, total: hs.length + ts.length + gone };
+}
+/* 전날 못 한 일은 다음 날 오전 7시에 자동 정리 (‘내일로’ 미룬 일은 남겨둠) */
+const appDay = () => ymd(new Date(Date.now() - 7 * 3600 * 1000));
+function cleanupExpired() {
+  const cut = appDay(); let n = 0;
+  S.dropped = S.dropped || {};
+  S.tasks = S.tasks.filter((x) => {
+    if (x.done || x.moved || x.date >= cut) return true;
+    const day = (S.dropped[x.date] = S.dropped[x.date] || {});
+    day[x.cat] = (day[x.cat] || 0) + 1; n++;
+    return false;
+  });
+  if (n) save();
+  return n;
 }
 function streakEnding(h, d) {
   let n = 0;
@@ -389,6 +404,7 @@ function allRate(from, to, fn = () => true) {
   for (let d = from; d <= to && d <= t; d = addDays(d, 1)) {
     if (!isRest(d)) for (const h of habitsOn(d)) if (fn(h.cat)) { total++; if (isDone(h.id, d)) done++; }
     for (const x of tasksOn(d)) if (fn(x.cat)) { total++; if (x.done) done++; }
+    for (const [cat, k] of Object.entries((S.dropped || {})[d] || {})) if (fn(cat)) total += k;
   }
   return total ? Math.round(done / total * 100) : null;
 }
@@ -489,7 +505,7 @@ function vChallenge() {
     <div class="row"><span class="icon-btn" style="color:var(--primary)">${I.shield}</span><div class="col grow"><b style="font-size:14px;color:#6E2F14">쉬는 날 쿠폰 ${restLeft}/${REST_PER_MONTH}</b><span class="small" style="color:var(--primary-dark)">아픈 날, 여행 가는 날엔 연속 기록을 지켜줘요</span></div></div>
     <button class="btn light" data-act="toggleRest" ${!isRest(t) && restLeft <= 0 ? 'disabled' : ''}>${isRest(t) ? '오늘 쉬는 날 취소하기' : restLeft > 0 ? '오늘 쉬는 날로 쓰기' : '이번 달 쿠폰을 다 썼어요'}</button></section>
   <button class="card" style="flex-direction:row;align-items:center;border:none;text-align:left;width:100%" data-act="go" data-view="friends">${mascotFor(mascotIndex(), 48)}<span class="col grow"><b style="font-size:14px">매일 바뀌는 친구들</b><span class="small muted">오늘은 ${MASCOTS[mascotIndex()].name} · 내일은 ${MASCOTS[mascotIndex(1)].name}</span></span>${I.right}</button>
-  <section class="card" style="background:var(--soft);box-shadow:none;flex-direction:row;align-items:center"><span class="small" style="color:#5C4536">‘내일로’ 미룬 일은 벌점도, 포인트도 없어요</span></section>
+  <section class="card" style="background:var(--soft);box-shadow:none;flex-direction:row;align-items:center"><span class="small" style="color:#5C4536">‘내일로’ 미룬 일은 벌점도, 포인트도 없어요. 못 한 일은 다음 날 아침 7시에 자동으로 정리되고, 미룬 일은 남아요</span></section>
   <section class="card"><h2>포인트 기록</h2><div class="ledger">${hist.length ? hist.map((e) => `<div><span>${md(e.d)} · ${esc(e.label)}${e.live ? ' <span class="xs muted">(진행 중)</span>' : ''}</span><b style="color:${e.pts > 0 ? '#3F6B26' : 'var(--bad)'}">${e.pts > 0 ? '+' : ''}${e.pts}P</b></div>`).join('') : '<span class="small muted">아직 기록이 없어요</span>'}</div></section>
   <section class="card" id="backup"><h2>휴대폰 바꿀 때 · 백업</h2><span class="small muted" style="line-height:1.6">기록은 이 폰에만 저장돼요. <b>예전 폰</b>에서 ‘백업 파일 저장’으로 파일을 카톡·드라이브·파일 앱에 보관하고, <b>새 폰</b>에서 ‘백업 불러오기’로 그 파일을 고르면 그대로 옮겨져요. 사진·영상·프로필 사진도 함께 옮겨져요.</span>
     <div class="row" style="gap:8px"><button class="btn ghost grow" data-act="exportData">백업 파일 저장</button><button class="btn ghost grow" data-act="importData">백업 불러오기</button></div>${S.lastBackup ? `<span class="xs muted">마지막 백업: ${md(S.lastBackup)}</span>` : ''}</section>`;
@@ -683,10 +699,13 @@ function persist() { try { navigator.storage && navigator.storage.persist && nav
 
 /* 날짜가 바뀌면(자정·오전 7시) 자동 정산·새로고침 */
 let lastDay = today(), lastMascot = mascotIndex();
-setInterval(() => { if (today() !== lastDay || mascotIndex() !== lastMascot) { lastDay = today(); lastMascot = mascotIndex(); ui.calSel = today(); settle(); render(); } }, 30000);
-document.addEventListener('visibilitychange', () => { if (!document.hidden && (today() !== lastDay || mascotIndex() !== lastMascot)) { lastDay = today(); lastMascot = mascotIndex(); settle(); render(); } });
+function rollover() { lastDay = today(); lastMascot = mascotIndex(); ui.calSel = today(); const n = cleanupExpired(); settle(); render(); if (n) flash(`어제 못 한 일 ${n}개를 정리했어요`); }
+setInterval(() => { if (today() !== lastDay || mascotIndex() !== lastMascot) rollover(); }, 30000);
+document.addEventListener('visibilitychange', () => { if (!document.hidden && (today() !== lastDay || mascotIndex() !== lastMascot)) rollover(); });
 window.addEventListener('hashchange', () => { const v = location.hash.slice(1); if (v && v !== ui.view) { ui.view = v; render(); } });
 
+const cleaned = cleanupExpired();
 settle();
 render();
+if (cleaned) flash(`어제 못 한 일 ${cleaned}개를 정리했어요`);
 if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('./sw.js').catch(() => {});
