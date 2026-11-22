@@ -28,17 +28,6 @@ jobs:
           distribution: temurin
           java-version: 17
 
-      - name: 서명 키 준비 (항상 같은 키로 서명해야 업데이트해도 기록이 남아요)
-        env:
-          ANDROID_KEYSTORE: ${{ secrets.ANDROID_KEYSTORE }}
-        run: |
-          if [ -z "$ANDROID_KEYSTORE" ]; then
-            echo "::error::ANDROID_KEYSTORE 시크릿이 없어요. Settings → Secrets and variables → Actions 에 추가해주세요."
-            exit 1
-          fi
-          mkdir -p ~/.android
-          echo "$ANDROID_KEYSTORE" | base64 -d > ~/.android/debug.keystore
-
       - name: 앱을 안드로이드 프로젝트로 감싸기 (Capacitor)
         run: |
           mkdir -p build-apk && cd build-apk
