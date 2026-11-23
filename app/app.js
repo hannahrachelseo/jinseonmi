@@ -1,6 +1,7 @@
 // Hannah's ToDo — 진·선·미·일 투두 & 습관 · Crafted By. Hannah T
 import { MASCOTS } from './mascots.js';
 import { PUPS, pupSvg } from './puppies.js';
+import { SAYINGS } from './sayings.js';
 
 /* ---------- 기본 상수 ---------- */
 const CATS = {
@@ -471,14 +472,8 @@ function vYear() {
 }
 
 /* ---------- 1년 계획 (강아지 친구들) ---------- */
-const SAYINGS = {
-  empty: ['계획 없으면 나 산책 안 나감 (진심)', '빈 칸 보니까 땅 파고 싶어짐', '첫 계획 써주면 앞발 줄게', '올해 뭐 할 거야? 귀 쫑긋 대기 중'],
-  good: ['견주 폼 미쳤다 왈!', '이 정도면 견생도 갓생 인정', '꼬리 너무 흔들어서 엉덩이까지 흔들림', '이 속도면 간식 2배 협상 가능', '킁킁… 성공 냄새 나는데?'],
-  slow: ['괜찮아, 나도 어제 소파 물어뜯고 반성 중', '늦어도 돼. 산책도 냄새 맡느라 늦잖아', '일단 누워. 3분 뒤에 일어나면 됨', '느려도 거북이보단 빠름 (아마도)', '오늘은 한 칸만 가자. 딱 한 칸만'],
-  done: ['완주?! 동네방네 짖고 올게', '오늘 간식 파티 확정이다 멍!', '꼬리 프로펠러로 이륙합니다', '이 견주 누구 견주? 내 견주!'],
-  yearEnd: ['연말이다! 남은 건 간식이랑 마무리뿐', '털갈이하듯 남은 계획 싹 정리하자', '올해 한나 = 견생 최고의 견주', '12월은 원래 막판 스퍼트의 달이야'],
-};
-const pick = (arr) => arr[(Number(today().replace(/-/g, '')) + arr.length) % arr.length];
+
+const pick = (arr) => arr[Math.floor(parse(today()).getTime() / 864e5 + 0.5) % arr.length]; // 매일 하나씩, 100일 동안 안 겹쳐요
 function vPlan() {
   const y = ui.calYear; const t = today(); const nowM = Number(t.slice(5, 7)); const thisYear = y === Number(t.slice(0, 4));
   const list = (S.plans || []).filter((p) => p.year === y).sort((a, b) => a.start - b.start || CAT_KEYS.indexOf(a.cat) - CAT_KEYS.indexOf(b.cat));
@@ -500,7 +495,7 @@ function vPlan() {
     <div class="row" style="gap:6px">${calModeSwitch()}<button class="icon-btn" data-act="calYear" data-d="-1" aria-label="이전 해">${I.left}</button><button class="icon-btn" data-act="calYear" data-d="1" aria-label="다음 해">${I.right}</button></div></header>
   <section class="plan">
     <div class="row between" style="align-items:flex-end;margin:0 4px">
-      <div class="col"><span class="small" style="color:#C27B8E">댕댕이들과 함께하는</span><span class="hand" style="font-size:26px;line-height:1.1">한 해 계획 ${list.length ? `<span class="pl-count">${doneN}/${list.length} 완주</span>` : ''}</span></div>
+      <div class="col"><span class="small" style="color:#C27B8E">오늘도 꼬리 프로펠러 가동</span><span class="hand" style="font-size:26px;line-height:1.1">한나의 갓생 지도 ${list.length ? `<span class="pl-count">${doneN}/${list.length} 완주</span>` : ''}</span></div>
       <div class="pl-host"><span class="pl-say">${esc(pick(SAYINGS[mood]))}</span>${pupSvg(hostKey, 58, mood === 'done')}</div>
     </div>
     <div class="pl-months">${Array.from({ length: 12 }, (_, i) => `<span class="${thisYear && i + 1 === nowM ? 'on' : ''}">${i + 1}</span>`).join('')}</div>
