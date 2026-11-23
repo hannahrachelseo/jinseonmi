@@ -35,15 +35,12 @@ jobs:
           npm install @capacitor/core@6 @capacitor/cli@6 @capacitor/android@6 @capacitor/filesystem@6
           cp -r ../app www
           sed -i "s/__BUILD__/${GITHUB_SHA::7}/" www/sw.js
+          python3 ../.github/scripts/make_version.py www "${GITHUB_SHA::7}"
           cat > capacitor.config.json <<'EOF'
           {
             "appId": "com.hannahrachelseo.hannahstodo",
             "appName": "Hannah's ToDo",
             "webDir": "www",
-            "server": {
-              "url": "https://hannahrachelseo.github.io/jinseonmi/",
-              "errorPath": "offline.html"
-            },
             "android": { "backgroundColor": "#FBF3E6" }
           }
           EOF

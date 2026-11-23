@@ -607,7 +607,8 @@ const actions = {
 /* ---------- 백업 (안드로이드 앱은 폰의 ‘문서’ 폴더에 자동 저장 → 앱을 지워도 남아요) ---------- */
 const CAP = window.Capacitor;
 const NATIVE = !!(CAP && CAP.isNativePlatform && CAP.isNativePlatform());
-const FS = NATIVE && CAP.Plugins ? CAP.Plugins.Filesystem : null;
+const plugin = (name) => (NATIVE ? ((CAP.Plugins && CAP.Plugins[name]) || (CAP.registerPlugin ? CAP.registerPlugin(name) : null)) : null);
+const FS = plugin('Filesystem');
 const hasData = () => S.habits.length + S.tasks.length + S.library.length + Object.keys(S.diary).length > 0;
 function installId() {
   let id = localStorage.getItem('hannahstodo.install');
@@ -757,4 +758,47 @@ render();
 if (cleaned) flash(`어제 못 한 일 ${cleaned}개를 정리했어요`);
 setTimeout(() => autoBackup(60), 4000);
 setInterval(() => autoBackup(30), 15 * 60e3);
-if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('./sw.js').catch(() => {});
+if (!NATIVE && 'serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('./sw.js').catch(() => {});
+
+/* ---------- 안드로이드 앱 조용한 자동 업데이트 ----------
+   켜질 때 새 버전이 있으면 몰래 받아두고, 앱을 닫거나 다른 앱으로 가면 바꿔둬요.
+   기록 저장 위치(https://localhost)는 그대로라 기록은 사라지지 않아요. */
+const REMOTE = 'https://hannahrachelseo.github.io/jinseonmi/';
+const WV = plugin('WebView');
+let pendingPath = null;
+async function liveUpdate() {
+  if (!FS || !WV) return;
+  try {
+    const cur = await (await fetch('./version.json', { cache: 'no-store' })).json();
+    const remote = await (await fetch(`${REMOTE}version.json?t=${Date.now()}`, { cache: 'no-store' })).json();
+    if (!remote.version || !Array.isArray(remote.files) || !remote.files.length) return;
+    const dir = 'live/' + remote.version;
+    try { // 지난 버전 폴더 정리
+      const list = await FS.readdir({ path: 'live', directory: 'DATA' });
+      for (const f of list.files || []) { const n = typeof f === 'string' ? f : f.name; if (n !== cur.version && n !== remote.version) await FS.rmdir({ path: 'live/' + n, directory: 'DATA', recursive: true }); }
+    } catch (e) { /* 처음이라 폴더가 없음 */ }
+    if (remote.version === cur.version) return;
+    if (localStorage.getItem('hannahstodo.ready') !== remote.version) {
+      for (const f of remote.files) {
+        const res = await fetch(`${REMOTE}${f}?v=${remote.version}`, { cache: 'no-store' });
+        if (!res.ok) throw new Error('받기 실패: ' + f);
+        const isText = /\.(html|js|css|json|webmanifest|svg|txt)$/i.test(f);
+        const data = isText ? await res.text() : (await toDataUrl(await res.blob())).split(',')[1];
+        await FS.writeFile({ path: `${dir}/${f}`, data, directory: 'DATA', recursive: true, ...(isText ? { encoding: 'utf8' } : {}) });
+      }
+      localStorage.setItem('hannahstodo.ready', remote.version);
+    }
+    const { uri } = await FS.getUri({ path: dir, directory: 'DATA' });
+    pendingPath = decodeURIComponent(uri.replace(/^file:\/\//, ''));
+  } catch (e) { console.warn('업데이트 확인 실패', e); }
+}
+async function applyUpdate() {
+  if (!pendingPath || !WV) return;
+  const p = pendingPath; pendingPath = null;
+  try { await save(); await WV.setServerBasePath({ path: p }); await WV.persistServerBasePath(); } catch (e) { console.warn('업데이트 적용 실패', e); }
+}
+if (NATIVE) {
+  setTimeout(liveUpdate, 3000);
+  setInterval(liveUpdate, 60 * 60e3);
+  document.addEventListener('visibilitychange', () => { if (document.hidden) applyUpdate(); else if (!pendingPath) liveUpdate(); });
+}
