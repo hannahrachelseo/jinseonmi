@@ -25,7 +25,7 @@ jobs:
 
       - name: 배포 버전 새기기 (폰에 새 버전이 바로 반영되도록)
         run: |
-          sed -i "s/__BUILD__/${GITHUB_SHA::7}/" app/sw.js
+          sed -i "s/__BUILD__/${GITHUB_SHA::7}/g" app/sw.js app/app.js app/index.html
           python3 .github/scripts/make_version.py app "${GITHUB_SHA::7}"
 
       - name: 문법 확인

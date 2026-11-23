@@ -1,7 +1,7 @@
 // Hannah's ToDo — 진·선·미·일 투두 & 습관 · Crafted By. Hannah T
-import { MASCOTS } from './mascots.js';
-import { PUPS, pupSvg } from './puppies.js';
-import { SAYINGS } from './sayings.js';
+import { MASCOTS } from './mascots.js?v=__BUILD__';
+import { PUPS, pupSvg } from './puppies.js?v=__BUILD__';
+import { SAYINGS } from './sayings.js?v=__BUILD__';
 
 /* ---------- 기본 상수 ---------- */
 const CATS = {
@@ -219,8 +219,17 @@ let flashTimer;
 function flash(msg) { ui.flash = msg; render(); clearTimeout(flashTimer); flashTimer = setTimeout(() => { ui.flash = ''; render(); }, 2200); }
 
 /* ---------- 렌더 ---------- */
+const BUILD = '__BUILD__'; // 배포할 때 실제 버전으로 바뀌어요
 let appVersion = '';
-fetch('./version.json', { cache: 'no-store' }).then((r) => r.json()).then((j) => { appVersion = j.version || ''; render(); }).catch(() => {});
+fetch(`./version.json?t=${Date.now()}`, { cache: 'no-store' }).then((r) => r.json()).then((j) => {
+  appVersion = j.version || '';
+  // 버전 파일은 새것인데 화면 코드가 예전 것으로 남아 있으면 한 번 새로 불러와요
+  if (!BUILD.startsWith('__') && appVersion && appVersion !== 'dev' && appVersion !== BUILD) {
+    const key = 'hannahstodo.reload.' + appVersion;
+    if (!sessionStorage.getItem(key)) { sessionStorage.setItem(key, '1'); location.replace(`./index.html?v=${appVersion}&r=${Date.now()}`); return; }
+  }
+  render();
+}).catch(() => {});
 const footer = () => `<footer class="footer">Crafted By. Hannah T${appVersion && appVersion !== 'dev' ? `<span class="xs" style="display:block;font-family:var(--body);font-weight:400;margin-top:2px">버전 ${appVersion}</span>` : ''}</footer>`;
 function render() {
   const app = document.getElementById('app');
@@ -721,7 +730,7 @@ function vChallenge() {
   <section class="card" style="background:var(--soft);box-shadow:none;flex-direction:row;align-items:center"><span class="small" style="color:#5C4536">‘내일로’ 미룬 일은 벌점도, 포인트도 없어요. 못 한 일은 다음 날 아침 7시에 자동으로 정리되고, 미룬 일은 남아요</span></section>
   ${raceRecords()}
   <section class="card"><h2>포인트 기록</h2><div class="ledger">${hist.length ? hist.map((e) => `<div><span>${md(e.d)} · ${esc(e.label)}${e.live ? ' <span class="xs muted">(진행 중)</span>' : ''}</span><b style="color:${e.pts > 0 ? '#3F6B26' : 'var(--bad)'}">${e.pts > 0 ? '+' : ''}${e.pts}P</b></div>`).join('') : '<span class="small muted">아직 기록이 없어요</span>'}</div></section>
-  <section class="card"><div class="row between"><div class="col"><b style="font-size:14px">앱 버전 ${appVersion || '확인 중'}</b><span class="small muted">새 기능이 안 보이면 눌러보세요</span></div><button class="btn ghost" data-act="checkUpdate">업데이트 확인</button></div></section>
+  <section class="card"><div class="row between"><div class="col"><b style="font-size:14px">앱 버전 ${appVersion || '확인 중'}${!BUILD.startsWith('__') && appVersion && BUILD !== appVersion ? ` <span class="xs" style="color:var(--bad)">(화면 ${BUILD})</span>` : ''}</b><span class="small muted">새 기능이 안 보이면 눌러보세요</span></div><button class="btn ghost" data-act="checkUpdate">업데이트 확인</button></div></section>
   <section class="card" id="backup"><h2>휴대폰 바꿀 때 · 백업</h2><span class="small muted" style="line-height:1.6">기록은 이 폰에만 저장돼요. <b>예전 폰</b>에서 ‘백업 파일 저장’으로 파일을 카톡·드라이브·파일 앱에 보관하고, <b>새 폰</b>에서 ‘백업 불러오기’로 그 파일을 고르면 그대로 옮겨져요. 사진·영상·프로필 사진도 함께 옮겨져요.</span>
     <div class="row" style="gap:8px"><button class="btn ghost grow" data-act="exportData">백업 파일 저장</button><button class="btn ghost grow" data-act="importData">백업 불러오기</button></div>${S.lastBackup ? `<span class="xs muted">마지막 백업: ${md(S.lastBackup)}</span>` : ''}</section>`;
 }

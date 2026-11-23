@@ -34,7 +34,7 @@ jobs:
           npm init -y >/dev/null
           npm install @capacitor/core@6 @capacitor/cli@6 @capacitor/android@6 @capacitor/filesystem@6
           cp -r ../app www
-          sed -i "s/__BUILD__/${GITHUB_SHA::7}/" www/sw.js
+          sed -i "s/__BUILD__/${GITHUB_SHA::7}/g" www/sw.js www/app.js www/index.html
           python3 ../.github/scripts/make_version.py www "${GITHUB_SHA::7}"
           cat > capacitor.config.json <<'EOF'
           {
