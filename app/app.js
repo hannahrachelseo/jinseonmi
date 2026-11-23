@@ -13,7 +13,7 @@ const CAT_KEYS = ['jin', 'seon', 'mi', 'il', 'etc'];
 const LIB = { '대화법': ['#FCE3D3', '#9C4A2A'], '연애': ['#FFE9DA', '#8F3F0A'], '재테크': ['#FFF4CC', '#7A5600'], '자기관리·계발': ['#E3EED9', '#3F6B26'] };
 const MOODS = ['최고', '좋음', '보통', '지침'];
 const WK = ['일', '월', '화', '수', '목', '금', '토'];
-const PTS = { full: 30, streak7: 100, miss3: -50, recover: 25 };
+const PTS = { full: 30, streak7: 100, miss3: -50, recover: 25, goalWeek: 50, goalMonth: 150 };
 const REST_PER_MONTH = 2;
 const KEY = 'jinseonmi.v1';
 
@@ -35,7 +35,7 @@ const mascotFor = (i, size) => `<svg width="${size}" height="${size}" viewBox="0
 const fresh = () => ({
   v: 1, createdAt: today(), seq: 1,
   habits: [], tasks: [], habitLog: {}, restDays: {}, ledger: {}, missions: {}, lastSettled: null, dropped: {},
-  library: [], diary: {},
+  library: [], diary: {}, goals: [], goalSkip: {},
 });
 let S = load();
 function load() {
@@ -288,6 +288,7 @@ function vToday() {
   </section>
 
   ${lv.full ? `<div class="celebrate">${mascotFor(mi, 52)}<div class="col grow"><span class="hand" style="font-size:22px;color:var(--gold-dark)">오늘 목표 100% 달성!</span><span class="small" style="color:var(--gold)">+${PTS.full}P가 쌓였어요 · ${esc(m.name)}도 신났어요</span></div></div>` : ''}
+  ${raceBanner()}
   ${rest ? `<div class="toast"><span>오늘은 쉬는 날이에요. 습관 연속 기록이 지켜져요</span><button class="mini" data-act="toggleRest">취소</button></div>` : ''}
   ${(() => { const has = S.habits.length + S.tasks.length + S.library.length > 0; const last = S.lastBackup; const days = last ? Math.round((parse(today()) - parse(last)) / 864e5) : null; return has && (days === null || days >= 7) ? `<div class="toast" style="background:var(--gold-bg);border:none"><span>${days === null ? '아직 백업을 안 했어요' : `백업한 지 ${days}일 됐어요`} · 앱을 새로 설치하기 전엔 꼭 백업!</span><button class="mini" style="background:#fff;color:var(--gold)" data-act="go" data-view="challenge">백업하기</button></div>` : ''; })()}
   ${!hasData() && !localStorage.getItem('hannahstodo.restoreHide') ? `<div class="card" style="background:var(--peach);box-shadow:none"><b style="font-size:15px;color:#6E2F14">앱을 새로 설치했나요?</b><span class="small" style="color:var(--primary-dark);line-height:1.6">예전 기록을 그대로 불러올 수 있어요. ${NATIVE ? '<b>내 파일 → 문서(Documents) → HannahsToDo</b> 폴더에서 가장 최근 파일을 골라주세요.' : '저장해둔 백업 파일을 골라주세요.'}</span><div class="row" style="gap:8px"><button class="btn grow" data-act="importData">기록 불러오기</button><button class="btn ghost" data-act="hideRestore">처음이에요</button></div></div>` : ''}
@@ -305,6 +306,91 @@ function vToday() {
   ${diaryCard(t)}`;
 }
 
+
+/* ---------- 주간 운동회 · 월간 마라톤 (목표 레이스) ---------- */
+const weekStart = (d) => addDays(d, -((parse(d).getDay() + 6) % 7));
+const pStart = (p, d = today()) => (p === 'week' ? weekStart(d) : d.slice(0, 8) + '01');
+const pEnd = (p, st) => (p === 'week' ? addDays(st, 6) : (() => { const x = parse(st); return ymd(new Date(x.getFullYear(), x.getMonth() + 1, 0)); })());
+const pPrev = (p, st) => (p === 'week' ? addDays(st, -7) : (() => { const x = parse(st); return ymd(new Date(x.getFullYear(), x.getMonth() - 1, 1)); })());
+const goalsOf = (p, st) => (S.goals || []).filter((g) => g.period === p && g.start === st).sort((a, b) => CAT_KEYS.indexOf(a.cat) - CAT_KEYS.indexOf(b.cat));
+const goalPts = (g) => (g.period === 'week' ? PTS.goalWeek : PTS.goalMonth);
+const SAY = (p) => (p >= 100 ? '완주!' : p >= 75 ? '조금만 더!' : p >= 50 ? '반 넘었다!' : p >= 25 ? '좋아좋아' : p > 0 ? '가보자!' : '출발~');
+function runnerSvg(i, legs, size) {
+  return `<svg width="${size}" height="${Math.round(size * 1.1)}" viewBox="0 0 100 110" aria-hidden="true"><ellipse cx="50" cy="104" rx="26" ry="5" fill="#3B2A20" opacity=".12"/><path d="M38 86l-10 16M62 86l12 14" stroke="${legs}" stroke-width="9" stroke-linecap="round"/>${MASCOTS[i].svg}</svg>`;
+}
+function raceLane(g, n) {
+  const c = CATS[g.cat]; const t = today();
+  const p = Math.min(100, Math.round((g.count / g.target) * 100));
+  const end = pEnd(g.period, g.start);
+  const total = Math.round((parse(end) - parse(g.start)) / 864e5) + 1;
+  const passed = Math.min(total, Math.round((parse(t) - parse(g.start)) / 864e5) + 1);
+  const pace = Math.round((passed / total) * 100);
+  const mi = (mascotIndex() + n) % 10;
+  const status = p >= 100 ? `완주 메달 +${goalPts(g)}P` : p >= pace - 5 ? '페이스 좋아요' : '조금 뒤처졌어요';
+  return `<div class="lane">
+    <div class="lane-head"><button class="lane-title" data-act="goalMenu" data-id="${g.id}"><b class="tag" style="background:${c.tint};color:${c.ink}">${c.ko}</b>${esc(g.title)}</button>
+      <span class="lane-n">${g.count}/${g.target}${esc(g.unit || '')}</span>
+      <button class="lane-btn" data-act="goalMinus" data-id="${g.id}" aria-label="${esc(g.title)} 1 빼기" ${g.count <= 0 ? 'disabled' : ''}>−</button>
+      <button class="lane-btn plus" style="background:${c.strong}" data-act="goalPlus" data-id="${g.id}" aria-label="${esc(g.title)} 1 더하기">+1</button></div>
+    <div class="rtrack" aria-label="${esc(g.title)} 진행 ${p}%, ${status}">
+      <i class="dirt"></i><i class="dash"></i>
+      ${[25, 50, 75].map((x) => `<span class="star" style="left:calc(${x}% * .86 + 6px);color:${p >= x ? '#E0A800' : '#FFF8EE'}">★</span>`).join('')}
+      ${p < 100 ? `<span class="pace" style="left:calc(${pace}% * .84)" title="오늘까지 이만큼 와 있으면 딱 좋아요">⚑</span>` : ''}
+      <i class="finish"></i>
+      <div class="runner ${ui.hop === g.id ? 'hop' : ''} ${p >= 100 ? 'done' : ''}" style="left:calc(${p}% * .78)">
+        <span class="say">${SAY(p)}</span>${runnerSvg(mi, c.strong, 38)}
+      </div>
+    </div>
+    <span class="lane-status" style="color:${p >= 100 ? '#7A5600' : p >= pace - 5 ? '#3F6B26' : '#8F3F0A'}">${status}</span>
+  </div>`;
+}
+function raceBanner() {
+  const p = ui.raceTab || 'week'; const st = pStart(p); const end = pEnd(p, st); const t = today();
+  const list = goalsOf(p, st);
+  const left = Math.round((parse(end) - parse(t)) / 864e5);
+  const doneN = list.filter((g) => g.count >= g.target).length;
+  const prev = goalsOf(p, pPrev(p, st)).filter((g) => g.count < g.target && !g.carried);
+  const showCarry = prev.length && !S.goalSkip[p + st];
+  return `<section class="race" aria-label="목표 레이스">
+    <div class="row between" style="margin:0 4px">
+      <div class="row" role="tablist" aria-label="기간" style="gap:6px">${[['week', '이번 주 운동회'], ['month', `${parse(st).getMonth() + 1}월 마라톤`]].map(([k, l]) => `<button role="tab" aria-selected="${p === k}" class="race-tab ${p === k ? 'on' : ''}" data-act="raceTab" data-k="${k}">${l}</button>`).join('')}</div>
+      <span class="pill" style="background:var(--gold-bg);color:var(--gold);font-size:11px">D-${left} · ${doneN}/${list.length} 완주</span>
+    </div>
+    ${showCarry ? `<div class="toast" style="border:none"><span>${p === 'week' ? '지난주' : '지난달'} 못 끝낸 목표 ${prev.length}개, 다시 도전할까요?</span><span class="row" style="gap:6px"><button class="mini" style="background:var(--peach);color:var(--primary)" data-act="goalCarry" data-k="${p}">도전!</button><button class="mini" data-act="goalSkip" data-k="${p}">괜찮아요</button></span></div>` : ''}
+    <div class="race-field">
+      ${list.length ? list.map((g, n) => raceLane(g, n)).join('') : `<div class="race-empty">${runnerSvg(mascotIndex(), '#9C4A2A', 54)}<span>${p === 'week' ? '이번 주' : '이번 달'} 목표를 세우고 친구랑 같이 달려요!<br><span class="xs">진·선·미·일·기타마다 여러 개 넣을 수 있어요</span></span></div>`}
+      <button class="race-add" data-act="addGoal" data-k="${p}">+ ${p === 'week' ? '주간' : '월간'} 목표 추가</button>
+    </div>
+  </section>`;
+}
+function goalSheet(g, period) {
+  sheetCat = g ? g.cat : 'jin';
+  const p = g ? g.period : period;
+  sheet(`<h2>${g ? '목표 고치기' : p === 'week' ? '이번 주 목표' : '이번 달 목표'}</h2>
+  <form data-form="goal" data-id="${g ? g.id : ''}" data-period="${p}" class="col" style="gap:10px">
+    <label class="lbl" for="g-title">목표</label><input id="g-title" name="title" class="field" value="${g ? esc(g.title) : ''}" placeholder="예: 책 읽기" required autocomplete="off">
+    <span class="lbl">영역</span><div class="cats" role="radiogroup" aria-label="영역">${CAT_KEYS.map((k) => catOpt(k, sheetCat === k, 'sheetCat')).join('')}</div>
+    <div class="row" style="gap:10px"><div class="col grow" style="gap:6px"><label class="lbl" for="g-target">몇 번(개)?</label><input id="g-target" name="target" type="number" inputmode="numeric" min="1" max="9999" class="field" value="${g ? g.target : 3}" required></div>
+      <div class="col grow" style="gap:6px"><label class="lbl" for="g-unit">단위</label><input id="g-unit" name="unit" class="field" value="${g ? esc(g.unit || '') : '번'}" placeholder="번, 권, 만원" maxlength="6"></div></div>
+    <button class="btn" type="submit">${g ? '저장' : '출발!'}</button>
+    ${g ? `<button class="btn danger" type="button" data-act="delGoal" data-id="${g.id}">삭제</button>` : ''}
+  </form>`);
+}
+function goalAward(g) {
+  const key = 'goal:' + g.id;
+  if (g.count >= g.target) { if (!S.ledger[key]) { S.ledger[key] = { d: today(), pts: goalPts(g), label: `${g.period === 'week' ? '주간' : '월간'} 완주 · ${g.title}`, medal: true }; return true; } }
+  else delete S.ledger[key];
+  return false;
+}
+function raceRecords() {
+  const t = today(); const mp = t.slice(0, 7);
+  const medals = Object.entries(S.ledger).filter(([k, e]) => k.startsWith('goal:') && e.d.startsWith(mp)).length;
+  const weeks = []; let st = weekStart(t);
+  for (let i = 0; i < 6; i++, st = addDays(st, -7)) { const gs = goalsOf('week', st); weeks.unshift({ st, n: gs.length, d: gs.filter((g) => g.count >= g.target).length }); }
+  return `<section class="card"><div class="row between"><h2>레이스 기록</h2><span class="small muted">이번 달 메달 ${medals}개</span></div>
+    <div class="weeks">${weeks.map((w) => `<div><i style="background:${!w.n ? 'var(--soft)' : w.d === w.n ? '#E3EED9' : w.d ? 'var(--gold-bg)' : 'var(--peach)'};color:${!w.n ? 'var(--muted)' : w.d === w.n ? '#3F6B26' : w.d ? 'var(--gold)' : 'var(--primary)'}">${w.n ? `${w.d}/${w.n}` : '–'}</i><span>${md(w.st)}~</span></div>`).join('')}</div>
+    <span class="xs muted">주마다 완주한 목표 수예요</span></section>`;
+}
 
 /* 일기 카드 (오늘 · 지난 날짜 모두) */
 function diaryCard(d) {
@@ -502,7 +588,7 @@ function vChallenge() {
   <header class="row"><button class="icon-btn" data-act="go" data-view="today" aria-label="뒤로">${I.left}</button><h1>도전 & 회복</h1></header>
   <section class="summary" style="border-radius:30px">${mascotFor(mi, 72)}
     <div class="col grow" style="gap:4px"><span class="small" style="color:var(--cream-text)">모은 포인트</span><span class="hand" style="font-size:42px;line-height:1">${totalPoints().toLocaleString('ko-KR')}P</span>
-      <span class="xs" style="color:var(--cream-text);line-height:1.5">하루 100% +${PTS.full}P · 7일 연속 +${PTS.streak7}P<br>3일 미수행 ${PTS.miss3}P · 회복 미션 +${PTS.recover}P</span></div></section>
+      <span class="xs" style="color:var(--cream-text);line-height:1.5">하루 100% +${PTS.full}P · 7일 연속 +${PTS.streak7}P<br>주간 목표 완주 +${PTS.goalWeek}P · 월간 완주 +${PTS.goalMonth}P<br>3일 미수행 ${PTS.miss3}P · 회복 미션 +${PTS.recover}P</span></div></section>
   <section class="card row" style="flex-direction:row;border:2px dashed #D9C3AA;background:var(--field);box-shadow:none"><span style="color:var(--primary)">${I.gift}</span>
     <div class="col grow"><b style="font-size:14px">포인트로 받을 보상</b><span class="small muted">아직 정하지 않았어요 · 정하면 여기에 들어가요</span></div></section>
   <section class="card"><div class="row between"><h2>7일 연속 스탬프</h2><span class="small muted">이번 달 ${stamps.length}개</span></div>
@@ -515,6 +601,7 @@ function vChallenge() {
     <button class="btn light" data-act="toggleRest" ${!isRest(t) && restLeft <= 0 ? 'disabled' : ''}>${isRest(t) ? '오늘 쉬는 날 취소하기' : restLeft > 0 ? '오늘 쉬는 날로 쓰기' : '이번 달 쿠폰을 다 썼어요'}</button></section>
   <button class="card" style="flex-direction:row;align-items:center;border:none;text-align:left;width:100%" data-act="go" data-view="friends">${mascotFor(mascotIndex(), 48)}<span class="col grow"><b style="font-size:14px">매일 바뀌는 친구들</b><span class="small muted">오늘은 ${MASCOTS[mascotIndex()].name} · 내일은 ${MASCOTS[mascotIndex(1)].name}</span></span>${I.right}</button>
   <section class="card" style="background:var(--soft);box-shadow:none;flex-direction:row;align-items:center"><span class="small" style="color:#5C4536">‘내일로’ 미룬 일은 벌점도, 포인트도 없어요. 못 한 일은 다음 날 아침 7시에 자동으로 정리되고, 미룬 일은 남아요</span></section>
+  ${raceRecords()}
   <section class="card"><h2>포인트 기록</h2><div class="ledger">${hist.length ? hist.map((e) => `<div><span>${md(e.d)} · ${esc(e.label)}${e.live ? ' <span class="xs muted">(진행 중)</span>' : ''}</span><b style="color:${e.pts > 0 ? '#3F6B26' : 'var(--bad)'}">${e.pts > 0 ? '+' : ''}${e.pts}P</b></div>`).join('') : '<span class="small muted">아직 기록이 없어요</span>'}</div></section>
   <section class="card" id="backup"><h2>휴대폰 바꿀 때 · 백업</h2><span class="small muted" style="line-height:1.6">기록은 이 폰에만 저장돼요. <b>예전 폰</b>에서 ‘백업 파일 저장’으로 파일을 카톡·드라이브·파일 앱에 보관하고, <b>새 폰</b>에서 ‘백업 불러오기’로 그 파일을 고르면 그대로 옮겨져요. 사진·영상·프로필 사진도 함께 옮겨져요.</span>
     <div class="row" style="gap:8px"><button class="btn ghost grow" data-act="exportData">백업 파일 저장</button><button class="btn ghost grow" data-act="importData">백업 불러오기</button></div>${S.lastBackup ? `<span class="xs muted">마지막 백업: ${md(S.lastBackup)}</span>` : ''}</section>`;
@@ -601,6 +688,14 @@ const actions = {
   toggleRest: () => { const t = today(); if (isRest(t)) delete S.restDays[t]; else if (restUsedThisMonth() < REST_PER_MONTH) S.restDays[t] = true; save(); render(); },
   exportData: () => exportBackup(),
   importData: () => document.getElementById('backup-input').click(),
+  raceTab: (el) => { ui.raceTab = el.dataset.k; render(); },
+  addGoal: (el) => goalSheet(null, el.dataset.k),
+  goalMenu: (el) => { const g = S.goals.find((x) => x.id === el.dataset.id); if (g) goalSheet(g); },
+  goalPlus: (el) => { const g = S.goals.find((x) => x.id === el.dataset.id); if (!g) return; g.count++; const won = goalAward(g); vibrate(); save(); ui.hop = g.id; render(); setTimeout(() => { if (ui.hop === g.id) { ui.hop = null; } }, 700); if (won) flash(`완주! ${g.title} +${goalPts(g)}P 메달 획득`); },
+  goalMinus: (el) => { const g = S.goals.find((x) => x.id === el.dataset.id); if (!g || g.count <= 0) return; g.count--; goalAward(g); save(); render(); },
+  delGoal: (el) => { const g = S.goals.find((x) => x.id === el.dataset.id); if (!el.dataset.confirm) return confirmSheet(`‘${g ? g.title : ''}’ 목표를 삭제할까요?`, 'delGoal', el.dataset.id); S.goals = S.goals.filter((x) => x.id !== el.dataset.id); delete S.ledger['goal:' + el.dataset.id]; save(); closeSheet(); render(); },
+  goalCarry: (el) => { const p = el.dataset.k; const st = pStart(p); for (const g of goalsOf(p, pPrev(p, st)).filter((x) => x.count < x.target && !x.carried)) { g.carried = true; S.goals.push({ id: uid(), period: p, start: st, cat: g.cat, title: g.title, target: g.target, unit: g.unit, count: 0 }); } save(); render(); flash('다시 출발!'); },
+  goalSkip: (el) => { S.goalSkip[el.dataset.k + pStart(el.dataset.k)] = true; save(); render(); },
   hideRestore: () => { localStorage.setItem('hannahstodo.restoreHide', '1'); render(); },
   closeSheet: (el, ev) => { if (ev.target === el) closeSheet(); },
 };
@@ -676,6 +771,12 @@ document.addEventListener('submit', (ev) => {
     const title = v('title'); const date = v('date') || today(); if (!title) return;
     if (f.dataset.id) { const x = S.tasks.find((y) => y.id === f.dataset.id); if (x) Object.assign(x, { title, date, cat: sheetCat }); }
     else S.tasks.push({ id: uid(), title, cat: sheetCat, date, done: false });
+    save(); closeSheet(); render();
+  } else if (kind === 'goal') {
+    const title = v('title'); const target = Math.max(1, Math.min(9999, parseInt(v('target'), 10) || 1)); const unit = v('unit').slice(0, 6); if (!title) return;
+    S.goals = S.goals || [];
+    if (f.dataset.id) { const g = S.goals.find((x) => x.id === f.dataset.id); if (g) { Object.assign(g, { title, target, unit, cat: sheetCat }); if (goalAward(g)) flash(`완주! +${goalPts(g)}P`); } }
+    else { const p = f.dataset.period || 'week'; S.goals.push({ id: uid(), period: p, start: pStart(p), cat: sheetCat, title, target, unit, count: 0 }); ui.raceTab = p; }
     save(); closeSheet(); render();
   } else if (kind === 'calAdd') {
     const title = v('title'); if (!title) return;

@@ -155,3 +155,34 @@ label.lbl{font-size:12px;color:var(--muted)}
 
 .trio>div:last-child:nth-child(odd){grid-column:1/-1}
 .cats{flex-wrap:wrap}.cat-opt{min-width:52px}
+
+/* 목표 레이스 */
+.race{background:#fff;border-radius:28px;padding:12px 10px 10px;display:flex;flex-direction:column;gap:8px;box-shadow:var(--shadow)}
+.race-tab{border:none;border-radius:999px;min-height:36px;padding:0 12px;font-weight:700;font-size:13px;background:var(--soft);color:#5C4536}
+.race-tab.on{background:var(--dark);color:#fff}
+.race-field{background:#CFE6B4;border-radius:22px;padding:10px 8px 8px;display:flex;flex-direction:column;gap:6px}
+.lane{display:flex;flex-direction:column;gap:0}
+.lane-head{display:flex;align-items:center;gap:6px;margin:0 2px}
+.lane-title{flex:1;min-width:0;border:none;background:none;text-align:left;padding:4px 0;font-size:13px;color:#2F521B;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lane-title .tag{margin-right:5px}
+.lane-n{font-size:12px;color:#2F521B;font-weight:700}
+.lane-btn{border:none;border-radius:12px;min-width:36px;height:34px;font-weight:700;font-size:14px;background:#fff;color:#2F521B}
+.lane-btn.plus{color:#fff;min-width:44px}
+.lane-btn:disabled{opacity:.4}
+.rtrack{position:relative;height:62px;margin-top:2px}
+.rtrack .dirt{position:absolute;left:0;right:0;bottom:2px;height:22px;border-radius:12px;background:#E9B98F}
+.rtrack .dash{position:absolute;left:10px;right:34px;bottom:12px;border-top:2px dashed #FFF8EE}
+.rtrack .star{position:absolute;bottom:5px;font-size:13px;line-height:1}
+.rtrack .pace{position:absolute;bottom:22px;font-size:14px;color:#8F3F0A;opacity:.55}
+.rtrack .finish{position:absolute;right:4px;bottom:2px;width:22px;height:30px;border-radius:4px;background:repeating-conic-gradient(#3B2A20 0 25%,#fff 0 50%) 0 0/8px 8px}
+.runner{position:absolute;bottom:4px;transition:left .6s cubic-bezier(.3,1.4,.5,1)}
+.runner .say{position:absolute;bottom:42px;left:18px;white-space:nowrap;background:#fff;color:#3B2A20;font-size:11px;padding:2px 7px;border-radius:10px 10px 10px 2px}
+.runner.hop svg{animation:hop .6s ease}
+.runner.done svg{animation:hop 1.2s ease infinite}
+@keyframes hop{0%,100%{transform:translateY(0)}30%{transform:translateY(-12px)}60%{transform:translateY(0)}75%{transform:translateY(-4px)}}
+.lane-status{font-size:11px;margin:0 6px 2px;font-weight:700}
+.race-empty{display:flex;align-items:center;gap:10px;padding:6px 6px;font-size:13px;color:#2F521B;line-height:1.5}
+.race-add{border:2px dashed rgba(47,82,27,.35);background:rgba(255,255,255,.55);border-radius:16px;min-height:42px;font-weight:700;font-size:13px;color:#2F521B}
+.weeks{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:6px;text-align:center}
+.weeks div{display:flex;flex-direction:column;align-items:center;gap:3px;font-size:10px;color:var(--muted)}
+.weeks i{width:100%;aspect-ratio:1;border-radius:14px;display:flex;align-items:center;justify-content:center;font-style:normal;font-weight:700;font-size:12px}
