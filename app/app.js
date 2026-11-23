@@ -217,14 +217,16 @@ let flashTimer;
 function flash(msg) { ui.flash = msg; render(); clearTimeout(flashTimer); flashTimer = setTimeout(() => { ui.flash = ''; render(); }, 2200); }
 
 /* ---------- 렌더 ---------- */
-const footer = '<footer class="footer">Crafted By. Hannah T</footer>';
+let appVersion = '';
+fetch('./version.json', { cache: 'no-store' }).then((r) => r.json()).then((j) => { appVersion = j.version || ''; render(); }).catch(() => {});
+const footer = () => `<footer class="footer">Crafted By. Hannah T${appVersion && appVersion !== 'dev' ? `<span class="xs" style="display:block;font-family:var(--body);font-weight:400;margin-top:2px">버전 ${appVersion}</span>` : ''}</footer>`;
 function render() {
   const app = document.getElementById('app');
   const views = { today: vToday, calendar: vCalendar, habits: vHabits, stats: vStats, library: vLibrary, challenge: vChallenge, friends: vFriends };
   const fn = views[ui.view] || vToday;
   const active = document.activeElement;
   const keep = active && active.id && app.contains(active) ? { id: active.id, s: active.selectionStart, e: active.selectionEnd } : null;
-  app.innerHTML = fn() + (ui.flash ? `<div class="toast" role="status" style="position:fixed;left:50%;transform:translateX(-50%);bottom:calc(96px + env(safe-area-inset-bottom));z-index:30;box-shadow:var(--shadow)">${esc(ui.flash)}</div>` : '') + footer;
+  app.innerHTML = fn() + (ui.flash ? `<div class="toast" role="status" style="position:fixed;left:50%;transform:translateX(-50%);bottom:calc(96px + env(safe-area-inset-bottom));z-index:30;box-shadow:var(--shadow)">${esc(ui.flash)}</div>` : '') + footer();
   if (keep) { const el = document.getElementById(keep.id); if (el) { el.focus(); try { el.setSelectionRange(keep.s, keep.e); } catch (e) { /* 일부 입력칸 제외 */ } } }
   document.getElementById('nav').innerHTML = `<div class="bar">${NAV.map(([k, l]) => `<button data-act="go" data-view="${k}" class="${ui.view === k ? 'on' : ''}" ${ui.view === k ? 'aria-current="page"' : ''}><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${I.nav[k]}</svg>${l}</button>`).join('')}</div>`;
 }
@@ -662,6 +664,7 @@ function vChallenge() {
   <section class="card" style="background:var(--soft);box-shadow:none;flex-direction:row;align-items:center"><span class="small" style="color:#5C4536">‘내일로’ 미룬 일은 벌점도, 포인트도 없어요. 못 한 일은 다음 날 아침 7시에 자동으로 정리되고, 미룬 일은 남아요</span></section>
   ${raceRecords()}
   <section class="card"><h2>포인트 기록</h2><div class="ledger">${hist.length ? hist.map((e) => `<div><span>${md(e.d)} · ${esc(e.label)}${e.live ? ' <span class="xs muted">(진행 중)</span>' : ''}</span><b style="color:${e.pts > 0 ? '#3F6B26' : 'var(--bad)'}">${e.pts > 0 ? '+' : ''}${e.pts}P</b></div>`).join('') : '<span class="small muted">아직 기록이 없어요</span>'}</div></section>
+  <section class="card"><div class="row between"><div class="col"><b style="font-size:14px">앱 버전 ${appVersion || '확인 중'}</b><span class="small muted">새 기능이 안 보이면 눌러보세요</span></div><button class="btn ghost" data-act="checkUpdate">업데이트 확인</button></div></section>
   <section class="card" id="backup"><h2>휴대폰 바꿀 때 · 백업</h2><span class="small muted" style="line-height:1.6">기록은 이 폰에만 저장돼요. <b>예전 폰</b>에서 ‘백업 파일 저장’으로 파일을 카톡·드라이브·파일 앱에 보관하고, <b>새 폰</b>에서 ‘백업 불러오기’로 그 파일을 고르면 그대로 옮겨져요. 사진·영상·프로필 사진도 함께 옮겨져요.</span>
     <div class="row" style="gap:8px"><button class="btn ghost grow" data-act="exportData">백업 파일 저장</button><button class="btn ghost grow" data-act="importData">백업 불러오기</button></div>${S.lastBackup ? `<span class="xs muted">마지막 백업: ${md(S.lastBackup)}</span>` : ''}</section>`;
 }
@@ -750,6 +753,7 @@ const actions = {
   calMode: (el) => { ui.calMode = el.dataset.k; if (ui.calMode === 'year') ui.calYear = Number(ui.calMonth.slice(0, 4)); render(); },
   calYear: (el) => { ui.calYear += Number(el.dataset.d); render(); },
   openMonth: (el) => { ui.calMonth = el.dataset.m; ui.calMode = 'month'; const t = today(); ui.calSel = t.startsWith(el.dataset.m) ? t : el.dataset.m + '-01'; render(); window.scrollTo(0, 0); },
+  checkUpdate: () => checkUpdate(),
   raceTab: (el) => { ui.raceTab = el.dataset.k; render(); },
   addGoal: (el) => goalSheet(null, el.dataset.k),
   goalMenu: (el) => { const g = S.goals.find((x) => x.id === el.dataset.id); if (g) goalSheet(g); },
@@ -960,8 +964,27 @@ async function applyUpdate() {
   const p = pendingPath; pendingPath = null;
   try { await save(); await WV.setServerBasePath({ path: p }); await WV.persistServerBasePath(); } catch (e) { console.warn('업데이트 적용 실패', e); }
 }
+const busy = () => document.getElementById('sheet-root').innerHTML || ['INPUT', 'TEXTAREA', 'SELECT'].includes((document.activeElement || {}).tagName);
 if (NATIVE) {
-  setTimeout(liveUpdate, 3000);
+  // 켜자마자 확인해서 이미 받아둔 새 버전이 있으면 바로 바꿔요
+  setTimeout(async () => { await liveUpdate(); if (pendingPath && !busy()) applyUpdate(); }, 1200);
   setInterval(liveUpdate, 60 * 60e3);
   document.addEventListener('visibilitychange', () => { if (document.hidden) applyUpdate(); else if (!pendingPath) liveUpdate(); });
+}
+async function checkUpdate() {
+  flash('새 버전을 확인하는 중이에요');
+  if (NATIVE) {
+    if (!FS || !WV) { flash('이 앱은 자동 업데이트를 지원하지 않는 예전 버전이에요. 새 APK를 한 번 설치해주세요'); return; }
+    await liveUpdate();
+    if (pendingPath) { flash('새 버전으로 바꿀게요'); setTimeout(applyUpdate, 600); } else flash(`이미 최신 버전이에요 (${appVersion})`);
+    return;
+  }
+  try {
+    const remote = await (await fetch(`./version.json?t=${Date.now()}`, { cache: 'no-store' })).json();
+    if (remote.version && remote.version !== appVersion) {
+      const reg = navigator.serviceWorker && await navigator.serviceWorker.getRegistration();
+      if (reg) await reg.update();
+      flash('새 버전으로 바꿀게요'); setTimeout(() => location.reload(), 600);
+    } else flash(`이미 최신 버전이에요 (${appVersion})`);
+  } catch (e) { flash('인터넷 연결을 확인해주세요'); }
 }

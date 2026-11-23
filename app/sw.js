@@ -16,7 +16,7 @@ self.addEventListener('fetch', (e) => {
   if (url.origin !== location.origin && !isFont) return;
   // 새 버전 먼저, 안 되면 저장본
   e.respondWith(
-    fetch(req).then((res) => {
+    fetch(req, { cache: url.origin === location.origin ? 'no-cache' : 'default' }).then((res) => {
       if (res && (res.ok || res.type === 'opaque')) { const copy = res.clone(); caches.open(VERSION).then((c) => c.put(req, copy)); }
       return res;
     }).catch(() => caches.match(req).then((hit) => hit || caches.match('./index.html')))
