@@ -40,6 +40,10 @@ jobs:
             "appId": "com.hannahrachelseo.hannahstodo",
             "appName": "Hannah's ToDo",
             "webDir": "www",
+            "server": {
+              "url": "https://hannahrachelseo.github.io/jinseonmi/",
+              "errorPath": "offline.html"
+            },
             "android": { "backgroundColor": "#FBF3E6" }
           }
           EOF

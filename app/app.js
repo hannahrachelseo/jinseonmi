@@ -267,7 +267,6 @@ function vToday() {
   const left = r.total - r.done;
   const cheer = r.total === 0 ? '오늘 할 일을 하나 적어볼까요?' : lv.full ? `오늘 목표 완료! +${PTS.full}P` : `남은 ${left}개만 하면 +${PTS.full}P!`;
   const circ = 2 * Math.PI * 38;
-  const diary = S.diary[t] || { mood: '', text: '', media: [] };
   return `
   <header class="top">
     <div class="row" style="gap:12px">${avatar}
@@ -303,14 +302,23 @@ function vToday() {
     ${byCat[k].list.length ? byCat[k].list.map(itemRow).join('') : `<div class="empty">+ 를 눌러 오늘의 ${c.ko} 할 일을 적어보세요</div>`}
   </section>`; }).join('')}
 
-  <section class="card" aria-label="오늘의 기록">
-    <div class="row between"><h2>오늘의 기록</h2><span class="small muted">일기 · 사진 · 영상</span></div>
-    <div class="moods" role="group" aria-label="오늘 기분">${MOODS.map((x) => `<button class="mood ${diary.mood === x ? 'on' : ''}" data-act="mood" data-mood="${x}" aria-pressed="${diary.mood === x}">${x}</button>`).join('')}</div>
-    <label class="lbl" for="diary-text">한 줄 일기</label>
-    <textarea id="diary-text" class="field" rows="3" placeholder="오늘 어땠어요? 짧게 남겨봐요">${esc(diary.text)}</textarea>
+  ${diaryCard(t)}`;
+}
+
+
+/* 일기 카드 (오늘 · 지난 날짜 모두) */
+function diaryCard(d) {
+  const t = today(); const isToday = d === t;
+  const diary = S.diary[d] || { mood: '', text: '', media: [] };
+  const title = isToday ? '오늘의 기록' : `${md(d)} 기록`;
+  return `<section class="card" aria-label="${title}">
+    <div class="row between"><h2>${title}</h2>${isToday ? '<button class="mini" data-act="go" data-view="calendar">지난 날 일기 쓰기 →</button>' : '<span class="small muted">지난 날도 쓸 수 있어요</span>'}</div>
+    <div class="moods" role="group" aria-label="${isToday ? '오늘' : md(d)} 기분">${MOODS.map((x) => `<button class="mood ${diary.mood === x ? 'on' : ''}" data-act="mood" data-date="${d}" data-mood="${x}" aria-pressed="${diary.mood === x}">${x}</button>`).join('')}</div>
+    <label class="lbl" for="diary-text">${isToday ? '한 줄 일기' : `${longDate(d)} 일기`}</label>
+    <textarea id="diary-text" data-date="${d}" class="field" rows="3" placeholder="${isToday ? '오늘 어땠어요? 짧게 남겨봐요' : '그날 어땠어요? 떠오르는 대로 적어봐요'}">${esc(diary.text)}</textarea>
     <div class="media-grid">
-      ${(diary.media || []).map((md2) => { const u = blobUrl('m:' + md2.id); return `<button class="tile" data-act="viewMedia" data-id="${md2.id}" aria-label="${md2.type === 'video' ? '영상' : '사진'} 보기">${u ? (md2.type === 'video' ? `<video src="${u}#t=0.1" muted playsinline preload="metadata"></video><span class="badge">영상</span>` : `<img src="${u}" alt="오늘 첨부한 사진">`) : (md2.type === 'video' ? I.video : I.camera)}</button>`; }).join('')}
-      <button class="tile add" data-act="addMedia">${I.plus}사진·영상</button>
+      ${(diary.media || []).map((m2) => { const u = blobUrl('m:' + m2.id); return `<button class="tile" data-act="viewMedia" data-date="${d}" data-id="${m2.id}" aria-label="${m2.type === 'video' ? '영상' : '사진'} 보기">${u ? (m2.type === 'video' ? `<video src="${u}#t=0.1" muted playsinline preload="metadata"></video><span class="badge">영상</span>` : `<img src="${u}" alt="${md(d)}에 첨부한 사진">`) : (m2.type === 'video' ? I.video : I.camera)}</button>`; }).join('')}
+      <button class="tile add" data-act="addMedia" data-date="${d}">${I.plus}사진·영상</button>
     </div>
   </section>`;
 }
@@ -331,7 +339,6 @@ function vCalendar() {
   const sel = ui.calSel; const diff = Math.round((parse(sel) - parse(t)) / 864e5);
   const tag = diff === 0 ? '오늘' : diff === 1 ? '내일' : diff === 2 ? '모레' : diff > 0 ? `${diff}일 뒤` : `${-diff}일 전`;
   const list = tasksOn(sel);
-  const dl = S.diary[sel];
   return `
   <header class="top"><h1>${y}년 ${mo}월</h1>
     <div class="row" style="gap:6px"><button class="icon-btn" data-act="calMonth" data-d="-1" aria-label="이전 달">${I.left}</button><button class="icon-btn" data-act="calMonth" data-d="1" aria-label="다음 달">${I.right}</button></div></header>
@@ -343,13 +350,13 @@ function vCalendar() {
     <div class="row between"><h2>${longDate(sel)}</h2><span class="small muted">${tag} · ${list.length}개</span></div>
     ${list.length ? list.map((x) => { const c = CATS[x.cat]; return `<div class="item" style="background:${c.tint}"><span class="hand" style="font-size:18px;width:22px;color:${c.ink}">${c.ko}</span><button class="label" data-act="taskMenu" data-id="${x.id}"><span class="t" style="${x.done ? 'text-decoration:line-through;color:var(--muted)' : ''}">${esc(x.title)}</span></button><button class="icon-btn sm" style="background:rgba(255,255,255,.75)" data-act="delTask" data-id="${x.id}" aria-label="${esc(x.title)} 삭제">${I.x}</button></div>`; }).join('') : '<div class="empty" style="background:var(--field)">아직 계획이 없어요. 아래에서 미리 적어두세요</div>'}
     ${S.habits.length ? `<span class="xs muted">습관 ${S.habits.length}개는 매일 자동으로 들어가요</span>` : ''}
-    ${dl && (dl.text || dl.mood) ? `<div class="empty" style="background:var(--field);text-align:left">${dl.mood ? `<b>${esc(dl.mood)}</b> · ` : ''}${esc(dl.text)}</div>` : ''}
     <form data-form="calAdd" class="col" style="gap:10px;border-top:1px dashed var(--line);padding-top:12px">
       <label class="lbl" for="cal-title">이 날 할 일 미리 추가</label>
       <input id="cal-title" name="title" class="field" placeholder="예: 헬스장 등록 상담" autocomplete="off" required>
       <div class="cats" role="radiogroup" aria-label="영역">${CAT_KEYS.map((k) => catOpt(k, ui.newCat === k, 'setNewCat')).join('')}</div><button class="btn" type="submit">추가</button>
     </form>
-  </section>`;
+  </section>
+  ${sel <= t ? diaryCard(sel) : '<div class="empty" style="background:#fff">일기는 그날이 되면 쓸 수 있어요</div>'}`;
 }
 const catOpt = (k, on, act) => `<button type="button" class="cat-opt" role="radio" aria-checked="${on}" data-act="${act}" data-cat="${k}" style="color:${CATS[k].ink};${on ? `background:${CATS[k].tint};border-color:${CATS[k].strong}` : ''}">${CATS[k].ko}</button>`;
 
@@ -586,11 +593,11 @@ const actions = {
   libMenu: (el) => { const x = S.library.find((y) => y.id === el.dataset.id); if (!x) return; const memo = x.kind === 'memo'; sheet(`<h2>${memo ? '메모 고치기' : '링크 고치기'}</h2><form data-form="libEdit" data-id="${x.id}" class="col" style="gap:10px">${memo ? `<label class="lbl" for="l-text">메모</label><textarea id="l-text" name="text" class="field" rows="6" required>${esc(x.text)}</textarea>` : `<label class="lbl" for="l-title">제목</label><input id="l-title" name="title" class="field" value="${esc(x.title)}" required>`}<label class="lbl" for="l-cat">분류</label><select id="l-cat" name="cat" class="field">${Object.keys(LIB).map((k) => `<option ${k === x.cat ? 'selected' : ''}>${k}</option>`).join('')}</select><button class="btn" type="submit">저장</button><button class="btn danger" type="button" data-act="libDel" data-id="${x.id}">삭제</button></form>`); },
   libMode: (el) => { ui.libMode = el.dataset.k; render(); },
   libDel: (el) => { S.library = S.library.filter((y) => y.id !== el.dataset.id); save(); closeSheet(); render(); },
-  mood: (el) => { const d = diaryOf(today()); d.mood = d.mood === el.dataset.mood ? '' : el.dataset.mood; save(); render(); },
+  mood: (el) => { const d = diaryOf(el.dataset.date || today()); d.mood = d.mood === el.dataset.mood ? '' : el.dataset.mood; save(); render(); },
   pickProfile: () => document.getElementById('profile-input').click(),
-  addMedia: () => document.getElementById('media-input').click(),
-  viewMedia: (el) => { const d = diaryOf(today()); const m = d.media.find((x) => x.id === el.dataset.id); if (!m) return; const u = urls['m:' + m.id]; sheet(`<div class="viewer">${m.type === 'video' ? `<video src="${u}" controls playsinline></video>` : `<img src="${u}" alt="첨부한 사진">`}</div><div class="row" style="gap:8px"><button class="btn ghost grow" data-act="closeSheet">닫기</button><button class="btn danger grow" data-act="delMedia" data-id="${m.id}">삭제</button></div>`); },
-  delMedia: async (el) => { const d = diaryOf(today()); d.media = d.media.filter((x) => x.id !== el.dataset.id); save(); closeSheet(); render(); try { await idb.del('m:' + el.dataset.id); } catch (e) { /* 무시 */ } },
+  addMedia: (el) => { ui.mediaDate = el.dataset.date || today(); document.getElementById('media-input').click(); },
+  viewMedia: (el) => { const dd = el.dataset.date || today(); const d = diaryOf(dd); const m = d.media.find((x) => x.id === el.dataset.id); if (!m) return; const u = urls['m:' + m.id]; sheet(`<div class="viewer">${m.type === 'video' ? `<video src="${u}" controls playsinline></video>` : `<img src="${u}" alt="첨부한 사진">`}</div><div class="row" style="gap:8px"><button class="btn ghost grow" data-act="closeSheet">닫기</button><button class="btn danger grow" data-act="delMedia" data-date="${dd}" data-id="${m.id}">삭제</button></div>`); },
+  delMedia: async (el) => { const d = diaryOf(el.dataset.date || today()); d.media = d.media.filter((x) => x.id !== el.dataset.id); save(); closeSheet(); render(); try { await idb.del('m:' + el.dataset.id); } catch (e) { /* 무시 */ } },
   toggleRest: () => { const t = today(); if (isRest(t)) delete S.restDays[t]; else if (restUsedThisMonth() < REST_PER_MONTH) S.restDays[t] = true; save(); render(); },
   exportData: () => exportBackup(),
   importData: () => document.getElementById('backup-input').click(),
@@ -695,7 +702,7 @@ document.addEventListener('submit', (ev) => {
 });
 let diaryTimer;
 document.addEventListener('input', (ev) => {
-  if (ev.target.id === 'diary-text') { diaryOf(today()).text = ev.target.value; clearTimeout(diaryTimer); diaryTimer = setTimeout(save, 250); }
+  if (ev.target.id === 'diary-text') { diaryOf(ev.target.dataset.date || today()).text = ev.target.value; clearTimeout(diaryTimer); diaryTimer = setTimeout(save, 250); }
 });
 document.getElementById('profile-input').addEventListener('change', async (ev) => {
   const file = ev.target.files[0]; ev.target.value = ''; if (!file) return;
@@ -703,7 +710,7 @@ document.getElementById('profile-input').addEventListener('change', async (ev) =
 });
 document.getElementById('media-input').addEventListener('change', async (ev) => {
   const files = [...ev.target.files]; ev.target.value = '';
-  const d = diaryOf(today());
+  const d = diaryOf(ui.mediaDate || today());
   for (const file of files) {
     const id = uid(); const type = file.type.startsWith('video') ? 'video' : 'image';
     try { const blob = type === 'image' ? await shrink(file, 1600) : file; await idb.set('m:' + id, blob); urls['m:' + id] = URL.createObjectURL(blob); d.media.push({ id, type }); } catch (e) { flash('파일이 너무 커서 저장하지 못했어요'); }
