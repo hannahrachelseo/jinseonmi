@@ -210,3 +210,26 @@ i.lg{width:10px;height:10px;border-radius:3px;display:inline-block}
 .mini-runner{position:absolute;bottom:3px}
 .wk-dots{display:flex;gap:4px}
 .wk-dots i{flex:1;height:20px;border-radius:7px;font-style:normal;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;color:#3B2A20}
+
+/* 1년 계획 · 강아지 */
+.plan{background:#FFF6F0;border-radius:28px;padding:14px 10px 12px;display:flex;flex-direction:column;gap:8px;color:#4A3328}
+.pl-count{font-family:var(--body);font-size:12px;background:#fff;color:#B23E63;border-radius:999px;padding:2px 8px;vertical-align:middle}
+.pl-host{position:relative;flex-shrink:0}
+.pl-say{position:absolute;right:52px;top:-4px;max-width:200px;background:#fff;border-radius:14px 14px 2px 14px;padding:5px 10px;font-size:12px;line-height:1.35;color:#8A4B5E;box-shadow:0 2px 8px rgba(91,58,36,.08);width:max-content}
+.pl-months{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:2px;margin:6px 2px 0}
+.pl-months span{text-align:center;font-size:11px;line-height:22px;height:22px;border-radius:11px;background:#fff;color:#9C7B6A}
+.pl-months span.on{background:#F28BA6;color:#fff;font-weight:700}
+.pl-board{position:relative;background:#fff;border-radius:20px;padding:8px 2px 6px;min-height:80px}
+.pl-now{position:absolute;top:4px;bottom:4px;border-left:2px dotted #F28BA6}
+.pl-row{position:relative;height:44px;margin:2px 0}
+.pl-ribbon{position:absolute;bottom:4px;height:26px;border-radius:13px;border:1.5px solid;overflow:hidden;padding:0;text-align:left}
+.pl-ribbon i{position:absolute;left:0;top:0;bottom:0;border-radius:11px}
+.pl-ribbon span{position:absolute;left:7px;right:4px;top:50%;transform:translateY(-50%);font-size:11px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pl-pup{position:absolute;bottom:16px;pointer-events:none}
+.pl-pup.happy svg{animation:hop 1.4s ease infinite}
+.pl-empty{display:flex;align-items:center;gap:10px;padding:8px;font-size:13px;color:#8A4B5E;line-height:1.5}
+.pl-add{border:2px dashed #F5B8C8;background:#fff;border-radius:16px;min-height:44px;font-weight:700;font-size:14px;color:#B23E63}
+.pl-crew{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));background:#fff;border-radius:18px;padding:8px 2px}
+.pl-crew div{display:flex;flex-direction:column;align-items:center;font-size:10px;color:#9C7B6A}
+.pl-crew b{font-size:12px}
+.pl-label{position:absolute;bottom:9px;font-size:11px;font-weight:700;white-space:nowrap;max-width:60%;overflow:hidden;text-overflow:ellipsis}

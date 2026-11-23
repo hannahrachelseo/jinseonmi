@@ -1,5 +1,6 @@
 // Hannah's ToDo — 진·선·미·일 투두 & 습관 · Crafted By. Hannah T
 import { MASCOTS } from './mascots.js';
+import { PUPS, pupSvg } from './puppies.js';
 
 /* ---------- 기본 상수 ---------- */
 const CATS = {
@@ -35,7 +36,7 @@ const mascotFor = (i, size) => `<svg width="${size}" height="${size}" viewBox="0
 const fresh = () => ({
   v: 1, createdAt: today(), seq: 1,
   habits: [], tasks: [], habitLog: {}, restDays: {}, ledger: {}, missions: {}, lastSettled: null, dropped: {},
-  library: [], diary: {}, goals: [], goalSkip: {},
+  library: [], diary: {}, goals: [], goalSkip: {}, plans: [],
 });
 let S = load();
 function load() {
@@ -412,7 +413,7 @@ function diaryCard(d) {
 }
 
 /* 1년 캘린더 + 올해 레이스 */
-const calModeSwitch = () => `<div class="seg" role="tablist" aria-label="보기">${[['month', '월'], ['year', '1년']].map(([k, l]) => `<button role="tab" aria-selected="${ui.calMode === k}" class="${ui.calMode === k ? 'on' : ''}" data-act="calMode" data-k="${k}">${l}</button>`).join('')}</div>`;
+const calModeSwitch = () => `<div class="seg" role="tablist" aria-label="보기">${[['month', '월'], ['year', '1년'], ['plan', '계획']].map(([k, l]) => `<button role="tab" aria-selected="${ui.calMode === k}" class="${ui.calMode === k ? 'on' : ''}" data-act="calMode" data-k="${k}">${l}</button>`).join('')}</div>`;
 function heat(d) {
   const r = dayRate(d);
   if (!r.total) return '';
@@ -469,9 +470,70 @@ function vYear() {
   </section>`;
 }
 
+/* ---------- 1년 계획 (강아지 친구들) ---------- */
+const SAYINGS = {
+  empty: ['올해 하고 싶은 거, 하나만 먼저 알려줘!', '꿈 지도 같이 그려볼까? 왕!', '첫 계획을 기다리고 있어, 꼬리 살랑살랑'],
+  good: ['오늘도 꼬리 흔들며 한 칸 전진!', '착착 잘하고 있어, 쓰담쓰담 해줄게', '이 속도면 우리 금방 도착해 멍!', '한나 최고야! 간식 나눠줄게'],
+  slow: ['괜찮아, 산책하듯 천천히 가자', '잠깐 쉬어도 돼. 다시 같이 걷자', '냄새 좀 맡고 다시 출발하자 멍', '조금 늦어도 우린 끝까지 간다!'],
+  done: ['해냈다! 꼬리 프로펠러 가동!', '완주 축하해! 왕왕왕!', '역시 우리 한나, 꼭 안아줄게'],
+  yearEnd: ['올해 정말 멋졌어. 내년에도 같이 달리자', '한 해 동안 수고 많았어, 꼬옥', '벌써 연말이야! 마지막 한 걸음만 더'],
+};
+const pick = (arr) => arr[(Number(today().replace(/-/g, '')) + arr.length) % arr.length];
+function vPlan() {
+  const y = ui.calYear; const t = today(); const nowM = Number(t.slice(5, 7)); const thisYear = y === Number(t.slice(0, 4));
+  const list = (S.plans || []).filter((p) => p.year === y).sort((a, b) => a.start - b.start || CAT_KEYS.indexOf(a.cat) - CAT_KEYS.indexOf(b.cat));
+  const doneN = list.filter((p) => p.progress >= 100).length;
+  // 말풍선: 상황에 맞게
+  const expected = (p) => { if (!thisYear) return y < Number(t.slice(0, 4)) ? 100 : 0; if (nowM < p.start) return 0; if (nowM > p.end) return 100; return Math.round(((nowM - p.start + 0.5) / (p.end - p.start + 1)) * 100); };
+  const behind = list.filter((p) => p.progress < 100 && p.progress < expected(p) - 15).length;
+  const mood = !list.length ? 'empty' : doneN === list.length ? 'done' : thisYear && nowM >= 11 ? 'yearEnd' : behind ? 'slow' : 'good';
+  const hostKey = CAT_KEYS[(Number(t.slice(8, 10))) % CAT_KEYS.length];
+  const ribbons = list.map((p) => {
+    const c = PUPS[p.cat]; const l = ((p.start - 1) / 12) * 100; const w = ((p.end - p.start + 1) / 12) * 100; const done = p.progress >= 100; const short = p.title.length > (p.end - p.start + 1) * 2.3 - 1.5;
+    return `<div class="pl-row"><button class="pl-ribbon" style="left:calc(${l}% + 2px);width:calc(${w}% - 4px);background:${c.ribbon};border-color:${c.ribbonOn}" data-act="planMenu" data-id="${p.id}" aria-label="${esc(p.title)}, ${p.start}월부터 ${p.end}월, 진행 ${p.progress}%">
+        <i style="width:${p.progress}%;background:${c.ribbonOn}"></i>${short ? `<span style="color:${c.ink};text-align:center;left:0;right:0">${done ? '♥' : ''}</span>` : `<span style="color:${c.ink}">${done ? '♥ ' : ''}${esc(p.title)}</span>`}</button>
+      ${short ? `<span class="pl-label" style="color:${c.ink};${p.end <= 8 ? `left:calc(${(p.end / 12) * 100}% + 4px)` : `right:calc(${((12 - p.start + 1) / 12) * 100}% + 4px);text-align:right`}">${esc(p.title)}</span>` : ''}
+      <span class="pl-pup ${done ? 'happy' : ''}" style="left:calc(${l}% + (${w}% - 4px) * ${Math.min(100, p.progress) / 100} - 16px)">${pupSvg(p.cat, 32, done)}</span></div>`;
+  }).join('');
+  return `
+  <header class="top"><h1>${y}년 계획</h1>
+    <div class="row" style="gap:6px">${calModeSwitch()}<button class="icon-btn" data-act="calYear" data-d="-1" aria-label="이전 해">${I.left}</button><button class="icon-btn" data-act="calYear" data-d="1" aria-label="다음 해">${I.right}</button></div></header>
+  <section class="plan">
+    <div class="row between" style="align-items:flex-end;margin:0 4px">
+      <div class="col"><span class="small" style="color:#C27B8E">댕댕이들과 함께하는</span><span class="hand" style="font-size:26px;line-height:1.1">한 해 계획 ${list.length ? `<span class="pl-count">${doneN}/${list.length} 완주</span>` : ''}</span></div>
+      <div class="pl-host"><span class="pl-say">${esc(pick(SAYINGS[mood]))}</span>${pupSvg(hostKey, 58, mood === 'done')}</div>
+    </div>
+    <div class="pl-months">${Array.from({ length: 12 }, (_, i) => `<span class="${thisYear && i + 1 === nowM ? 'on' : ''}">${i + 1}</span>`).join('')}</div>
+    <div class="pl-board">
+      ${thisYear ? `<i class="pl-now" style="left:${((nowM - 0.5) / 12) * 100}%"></i>` : ''}
+      ${list.length ? ribbons : `<div class="pl-empty">${pupSvg('seon', 60)}<span>아래 버튼으로 첫 계획을 세워봐요<br><span class="xs">여러 달에 걸친 계획도 돼요</span></span></div>`}
+    </div>
+    <button class="pl-add" data-act="addPlan">+ 계획 추가</button>
+    <div class="pl-crew">${CAT_KEYS.map((k) => `<div>${pupSvg(k, 46)}<b style="color:${PUPS[k].ink}">${PUPS[k].name}</b><span>${PUPS[k].breed} · ${CATS[k].ko}</span></div>`).join('')}</div>
+  </section>`;
+}
+function planSheet(p) {
+  sheetCat = p ? p.cat : 'jin';
+  const nowM = Number(today().slice(5, 7));
+  const mOpt = (sel) => Array.from({ length: 12 }, (_, i) => `<option value="${i + 1}" ${sel === i + 1 ? 'selected' : ''}>${i + 1}월</option>`).join('');
+  sheet(`<h2>${p ? '계획 고치기' : `${ui.calYear}년 계획 추가`}</h2>
+  <form data-form="plan" data-id="${p ? p.id : ''}" class="col" style="gap:10px">
+    <label class="lbl" for="p-title">계획</label><input id="p-title" name="title" class="field" value="${p ? esc(p.title) : ''}" placeholder="예: 토익 900점" required autocomplete="off">
+    <span class="lbl">영역</span><div class="cats" role="radiogroup" aria-label="영역">${CAT_KEYS.map((k) => catOpt(k, sheetCat === k, 'sheetCat')).join('')}</div>
+    <div class="row" style="gap:10px"><div class="col grow" style="gap:6px"><label class="lbl" for="p-start">시작</label><select id="p-start" name="start" class="field">${mOpt(p ? p.start : nowM)}</select></div>
+      <div class="col grow" style="gap:6px"><label class="lbl" for="p-end">끝</label><select id="p-end" name="end" class="field">${mOpt(p ? p.end : nowM)}</select></div></div>
+    <label class="lbl" for="p-prog">진행률 <b id="p-prog-v">${p ? p.progress : 0}%</b></label>
+    <input id="p-prog" name="progress" type="range" min="0" max="100" step="10" value="${p ? p.progress : 0}" style="accent-color:#F28BA6">
+    <label class="lbl" for="p-memo">메모</label><textarea id="p-memo" name="memo" class="field" rows="3" placeholder="어떻게 할지 적어봐요">${p ? esc(p.memo || '') : ''}</textarea>
+    <button class="btn" type="submit">${p ? '저장' : '계획 세우기'}</button>
+    ${p ? `<button class="btn danger" type="button" data-act="delPlan" data-id="${p.id}">삭제</button>` : ''}
+  </form>`);
+}
+
 /* 캘린더 */
 function vCalendar() {
   if (ui.calMode === 'year') return vYear();
+  if (ui.calMode === 'plan') return vPlan();
   const [y, mo] = ui.calMonth.split('-').map(Number);
   const first = new Date(y, mo - 1, 1); const days = new Date(y, mo, 0).getDate();
   const t = today(); const cells = [];
@@ -754,6 +816,9 @@ const actions = {
   calYear: (el) => { ui.calYear += Number(el.dataset.d); render(); },
   openMonth: (el) => { ui.calMonth = el.dataset.m; ui.calMode = 'month'; const t = today(); ui.calSel = t.startsWith(el.dataset.m) ? t : el.dataset.m + '-01'; render(); window.scrollTo(0, 0); },
   checkUpdate: () => checkUpdate(),
+  addPlan: () => planSheet(null),
+  planMenu: (el) => { const p = (S.plans || []).find((x) => x.id === el.dataset.id); if (p) planSheet(p); },
+  delPlan: (el) => { const p = (S.plans || []).find((x) => x.id === el.dataset.id); if (!el.dataset.confirm) return confirmSheet(`‘${p ? p.title : ''}’ 계획을 삭제할까요?`, 'delPlan', el.dataset.id); S.plans = S.plans.filter((x) => x.id !== el.dataset.id); save(); closeSheet(); render(); },
   raceTab: (el) => { ui.raceTab = el.dataset.k; render(); },
   addGoal: (el) => goalSheet(null, el.dataset.k),
   goalMenu: (el) => { const g = S.goals.find((x) => x.id === el.dataset.id); if (g) goalSheet(g); },
@@ -838,6 +903,15 @@ document.addEventListener('submit', (ev) => {
     if (f.dataset.id) { const x = S.tasks.find((y) => y.id === f.dataset.id); if (x) Object.assign(x, { title, date, cat: sheetCat }); }
     else S.tasks.push({ id: uid(), title, cat: sheetCat, date, done: false });
     save(); closeSheet(); render();
+  } else if (kind === 'plan') {
+    const title = v('title'); if (!title) return;
+    let start = Number(v('start')) || 1, end = Number(v('end')) || start; if (end < start) [start, end] = [end, start];
+    const progress = Math.max(0, Math.min(100, Number(v('progress')) || 0)); const memo = String(fd.get('memo') || '').trim();
+    S.plans = S.plans || [];
+    const was = f.dataset.id ? (S.plans.find((x) => x.id === f.dataset.id) || {}).progress : 0;
+    if (f.dataset.id) { const p = S.plans.find((x) => x.id === f.dataset.id); if (p) Object.assign(p, { title, cat: sheetCat, start, end, progress, memo }); }
+    else S.plans.push({ id: uid(), year: ui.calYear, title, cat: sheetCat, start, end, progress, memo });
+    save(); closeSheet(); render(); if (progress >= 100 && was < 100) flash(`‘${title}’ 완주! ${PUPS[sheetCat].name}가 꼬리를 흔들어요`);
   } else if (kind === 'goal') {
     const title = v('title'); const target = Math.max(1, Math.min(9999, parseInt(v('target'), 10) || 1)); const unit = v('unit').slice(0, 6); if (!title) return;
     S.goals = S.goals || [];
@@ -870,6 +944,7 @@ document.addEventListener('submit', (ev) => {
 });
 let diaryTimer;
 document.addEventListener('input', (ev) => {
+  if (ev.target.id === 'p-prog') { const o = document.getElementById('p-prog-v'); if (o) o.textContent = ev.target.value + '%'; }
   if (ev.target.id === 'diary-text') { diaryOf(ev.target.dataset.date || today()).text = ev.target.value; clearTimeout(diaryTimer); diaryTimer = setTimeout(save, 250); }
 });
 document.getElementById('profile-input').addEventListener('change', async (ev) => {
