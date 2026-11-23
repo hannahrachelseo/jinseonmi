@@ -206,7 +206,7 @@ const I = {
 const ui = {
   view: (location.hash.slice(1) || 'today'),
   habitFilter: 'all', statTab: '일',
-  calSel: today(), calMonth: today().slice(0, 7),
+  calSel: today(), calMonth: today().slice(0, 7), calMode: 'month', calYear: Number(today().slice(0, 4)),
   libTab: '전체', libCat: '대화법', libMode: 'link', newCat: 'jin',
   undo: null, flash: '',
 };
@@ -409,8 +409,67 @@ function diaryCard(d) {
   </section>`;
 }
 
+/* 1년 캘린더 + 올해 레이스 */
+const calModeSwitch = () => `<div class="seg" role="tablist" aria-label="보기">${[['month', '월'], ['year', '1년']].map(([k, l]) => `<button role="tab" aria-selected="${ui.calMode === k}" class="${ui.calMode === k ? 'on' : ''}" data-act="calMode" data-k="${k}">${l}</button>`).join('')}</div>`;
+function heat(d) {
+  const r = dayRate(d);
+  if (!r.total) return '';
+  const p = r.done / r.total;
+  return p >= 1 ? 'background:#9C4A2A;color:#fff' : p >= 0.5 ? 'background:#F2A97E' : p > 0 ? 'background:#F7C9A8' : 'background:#EADBC8';
+}
+function vYear() {
+  const y = ui.calYear; const t = today();
+  const months = [];
+  for (let m = 1; m <= 12; m++) {
+    const first = new Date(y, m - 1, 1); const n = new Date(y, m, 0).getDate();
+    const cells = [];
+    for (let i = 0; i < first.getDay(); i++) cells.push('<i></i>');
+    for (let dd = 1; dd <= n; dd++) {
+      const d = `${y}-${pad(m)}-${pad(dd)}`;
+      const st = d <= t ? heat(d) : (tasksOn(d).length ? 'box-shadow:inset 0 0 0 1.5px #D9C3AA' : '');
+      cells.push(`<i class="${d === t ? 'now' : ''}" style="${st}">${dd}</i>`);
+    }
+    const mg = goalsOf('month', `${y}-${pad(m)}-01`); const mDone = mg.filter((g) => g.count >= g.target).length;
+    months.push(`<button class="ymonth ${`${y}-${pad(m)}` === t.slice(0, 7) ? 'cur' : ''}" data-act="openMonth" data-m="${y}-${pad(m)}" aria-label="${m}월 보기">
+      <span class="ym-head"><b>${m}월</b>${mg.length ? `<span class="ym-medal ${mDone === mg.length ? 'all' : ''}">${mDone}/${mg.length}</span>` : ''}</span>
+      <span class="ym-grid">${cells.join('')}</span></button>`);
+  }
+  // 올해 레이스 기록 (월간 마라톤 + 주간 운동회)
+  const rows = [];
+  for (let m = 1; m <= 12; m++) {
+    const ms = `${y}-${pad(m)}-01`; const me = pEnd('month', ms);
+    if (ms > t) break;
+    const mg = goalsOf('month', ms); const mDone = mg.filter((g) => g.count >= g.target).length;
+    const anyWeek = (S.goals || []).some((g) => g.period === 'week' && g.start >= weekStart(ms) && g.start <= me);
+    if (ms.slice(0, 7) < S.createdAt.slice(0, 7) && !mg.length && !anyWeek) continue;
+    const p = mg.length ? Math.round(mg.reduce((a, g) => a + Math.min(1, g.count / g.target), 0) / mg.length * 100) : 0;
+    const weeks = [];
+    for (let w = weekStart(ms); w <= me; w = addDays(w, 7)) { if (w < ms && weekStart(ms) !== w) continue; if (w > t) break; const gs = goalsOf('week', w); weeks.push({ w, n: gs.length, d: gs.filter((g) => g.count >= g.target).length }); }
+    const medals = Object.entries(S.ledger).filter(([k, e]) => k.startsWith('goal:') && e.d.slice(0, 7) === ms.slice(0, 7)).length;
+    rows.unshift(`<div class="yrace">
+      <div class="row between"><b class="hand" style="font-size:19px">${m}월</b><span class="xs muted">${mg.length ? `마라톤 ${mDone}/${mg.length} 완주` : '마라톤 목표 없음'} · 메달 ${medals}개</span></div>
+      <div class="mini-track"><i class="dirt"></i>${[25, 50, 75].map((x) => `<span class="star" style="left:calc(${x}% * .86 + 4px);color:${p >= x ? '#E0A800' : '#FFF8EE'}">★</span>`).join('')}<i class="finish"></i>
+        <span class="mini-runner" style="left:calc(${p}% * .8)">${runnerSvg((m - 1) % 10, '#9C4A2A', 30)}</span></div>
+      <div class="wk-dots" aria-label="주간 운동회">${weeks.map((x) => `<i title="${md(x.w)}~" style="background:${!x.n ? 'var(--soft)' : x.d === x.n ? '#9CC77A' : x.d ? '#F2CF66' : '#F7C9A8'}">${x.n ? `${x.d}/${x.n}` : ''}</i>`).join('')}</div>
+    </div>`);
+  }
+  return `
+  <header class="top"><h1>${y}년</h1>
+    <div class="row" style="gap:6px">${calModeSwitch()}<button class="icon-btn" data-act="calYear" data-d="-1" aria-label="이전 해">${I.left}</button><button class="icon-btn" data-act="calYear" data-d="1" aria-label="다음 해">${I.right}</button></div></header>
+  <section class="card" style="padding:12px 10px">
+    <div class="ygrid">${months.join('')}</div>
+    <div class="row xs muted" style="justify-content:center;gap:10px;flex-wrap:wrap"><span class="row" style="gap:4px"><i class="lg" style="background:#EADBC8"></i>0%</span><span class="row" style="gap:4px"><i class="lg" style="background:#F7C9A8"></i>조금</span><span class="row" style="gap:4px"><i class="lg" style="background:#F2A97E"></i>절반 넘게</span><span class="row" style="gap:4px"><i class="lg" style="background:#9C4A2A"></i>100%</span></div>
+  </section>
+  ${y === Number(t.slice(0, 4)) ? raceBanner() : ''}
+  <section class="card"><div class="row between"><h2>${y}년 레이스</h2><span class="small muted">마라톤 · 운동회</span></div>
+    ${rows.length ? rows.join('') : '<span class="small muted">아직 기록이 없어요</span>'}
+    <div class="row xs muted" style="gap:10px;flex-wrap:wrap"><span class="row" style="gap:4px"><i class="lg" style="background:#9CC77A"></i>주간 전부 완주</span><span class="row" style="gap:4px"><i class="lg" style="background:#F2CF66"></i>일부 완주</span><span class="row" style="gap:4px"><i class="lg" style="background:#F7C9A8"></i>미완주</span></div>
+  </section>`;
+}
+
 /* 캘린더 */
 function vCalendar() {
+  if (ui.calMode === 'year') return vYear();
   const [y, mo] = ui.calMonth.split('-').map(Number);
   const first = new Date(y, mo - 1, 1); const days = new Date(y, mo, 0).getDate();
   const t = today(); const cells = [];
@@ -427,7 +486,7 @@ function vCalendar() {
   const list = tasksOn(sel);
   return `
   <header class="top"><h1>${y}년 ${mo}월</h1>
-    <div class="row" style="gap:6px"><button class="icon-btn" data-act="calMonth" data-d="-1" aria-label="이전 달">${I.left}</button><button class="icon-btn" data-act="calMonth" data-d="1" aria-label="다음 달">${I.right}</button></div></header>
+    <div class="row" style="gap:6px">${calModeSwitch()}<button class="icon-btn" data-act="calMonth" data-d="-1" aria-label="이전 달">${I.left}</button><button class="icon-btn" data-act="calMonth" data-d="1" aria-label="다음 달">${I.right}</button></div></header>
   <section class="card" style="padding:14px 10px">
     <div class="cal-grid">${WK.map((w, i) => `<span class="wk" style="${i === 0 ? 'color:#B5483F' : i === 6 ? 'color:#3E7FA3' : ''}">${w}</span>`).join('')}${cells.join('')}</div>
     <div class="row xs muted" style="justify-content:center;gap:14px">${CAT_KEYS.map((k) => `<span class="row" style="gap:4px"><i style="width:8px;height:8px;border-radius:50%;background:${CATS[k].strong}"></i>${CATS[k].ko}</span>`).join('')}</div>
@@ -688,6 +747,9 @@ const actions = {
   toggleRest: () => { const t = today(); if (isRest(t)) delete S.restDays[t]; else if (restUsedThisMonth() < REST_PER_MONTH) S.restDays[t] = true; save(); render(); },
   exportData: () => exportBackup(),
   importData: () => document.getElementById('backup-input').click(),
+  calMode: (el) => { ui.calMode = el.dataset.k; if (ui.calMode === 'year') ui.calYear = Number(ui.calMonth.slice(0, 4)); render(); },
+  calYear: (el) => { ui.calYear += Number(el.dataset.d); render(); },
+  openMonth: (el) => { ui.calMonth = el.dataset.m; ui.calMode = 'month'; const t = today(); ui.calSel = t.startsWith(el.dataset.m) ? t : el.dataset.m + '-01'; render(); window.scrollTo(0, 0); },
   raceTab: (el) => { ui.raceTab = el.dataset.k; render(); },
   addGoal: (el) => goalSheet(null, el.dataset.k),
   goalMenu: (el) => { const g = S.goals.find((x) => x.id === el.dataset.id); if (g) goalSheet(g); },
