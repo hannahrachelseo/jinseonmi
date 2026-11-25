@@ -24,7 +24,7 @@ const pad = (n) => String(n).padStart(2, '0');
 const ymd = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 const parse = (s) => { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d); };
 const addDays = (s, n) => { const d = parse(s); d.setDate(d.getDate() + n); return ymd(d); };
-const today = () => ymd(new Date());
+const today = () => ymd(new Date(Date.now() - 7 * 3600 * 1000)); // 하루는 오전 7시에 넘어가요 (새벽에도 전날 체크 가능)
 const md = (s) => { const d = parse(s); return `${d.getMonth() + 1}/${d.getDate()}`; };
 const longDate = (s) => { const d = parse(s); return `${d.getMonth() + 1}월 ${d.getDate()}일 ${WK[d.getDay()]}요일`; };
 const mascotIndex = (offset = 0) => {
@@ -688,7 +688,7 @@ function vLibrary() {
     ${ui.libMode === 'memo' ? `<label class="lbl" for="lib-memo">메모</label>
     <textarea id="lib-memo" name="memo" class="field" rows="4" placeholder="생각, 좋은 문장, 책 구절, 해볼 것… 자유롭게 적어요" required></textarea>
     <button class="btn" type="submit">메모 저장</button>` : `<label class="lbl" for="lib-url">링크 붙여넣기</label>
-    <div class="row" style="gap:8px"><div class="row grow field" style="gap:8px;padding:0 12px">${I.link}<input id="lib-url" name="url" type="url" inputmode="url" placeholder="https://" style="flex:1;min-width:0;border:none;background:none;height:44px;font-size:15px;outline:none" required autocomplete="off"></div>
+    <div class="row" style="gap:8px"><div class="row grow field" style="gap:8px;padding:0 12px">${I.link}<input id="lib-url" name="url" type="text" inputmode="url" placeholder="링크나 공유 문구를 그대로 붙여넣어요" style="flex:1;min-width:0;border:none;background:none;height:44px;font-size:15px;outline:none" required autocomplete="off"></div>
       <button class="btn" type="submit">저장</button></div>
     <input name="title" class="field" placeholder="제목 (비우면 주소로 저장)" aria-label="제목" autocomplete="off">`}
     <div class="row" style="gap:6px;flex-wrap:wrap" role="radiogroup" aria-label="분류">${Object.keys(LIB).map((k) => `<button type="button" class="chip" role="radio" aria-checked="${ui.libCat === k}" data-act="libCat" data-k="${k}" style="min-height:36px;color:${LIB[k][1]};border:2px solid ${ui.libCat === k ? LIB[k][1] : 'var(--line)'};background:${ui.libCat === k ? LIB[k][0] : '#fff'}">${k}</button>`).join('')}</div>
@@ -697,7 +697,7 @@ function vLibrary() {
   ${items.length ? items.map((x) => { const [tint, ink] = LIB[x.cat] || LIB['대화법']; const memo = x.kind === 'memo'; const label = memo ? x.text.split('\n')[0].slice(0, 30) : x.title; return `<article class="card lib-item ${x.done ? 'done' : ''}" style="flex-direction:row;padding:12px 12px 12px 14px;${memo ? 'align-items:flex-start' : ''}">
       <button class="check" style="${x.done ? 'background:var(--primary);border-color:var(--primary)' : ''}" data-act="libToggle" data-id="${x.id}" aria-pressed="${x.done}" aria-label="${esc(label)} ${memo ? '완료' : '봤어요'}">${x.done ? I.check : ''}</button>
       <span class="lib-icon" style="background:${tint};color:${ink}">${memo ? I.edit.replace(/16/g, '22') : x.video ? I.video : I.doc}</span>
-      <div class="col grow" style="gap:3px">${memo ? `<span class="lib-title" style="font-weight:400;white-space:pre-wrap">${esc(x.text)}</span>` : `<a class="lib-title" href="${esc(x.url)}" target="_blank" rel="noopener noreferrer">${esc(x.title)}</a>`}
+      <div class="col grow" style="gap:3px">${memo ? `<span class="lib-title" style="font-weight:400;white-space:pre-wrap">${esc(x.text)}</span>` : `<button class="lib-title" style="background:none;border:none;padding:0;text-align:left;cursor:pointer" data-act="libOpen" data-id="${x.id}">${esc(x.title)}</button><span class="xs lib-url">${esc(x.url)}</span>`}
         <span class="xs muted row" style="gap:6px"><span class="tag" style="background:${tint};color:${ink}">${x.cat}</span>${memo ? `메모 · ${md(x.at)}` : esc(x.host)}</span></div>
       <button class="icon-btn sm" data-act="libMenu" data-id="${x.id}" aria-label="${esc(label)} 편집">${I.edit}</button>
     </article>`; }).join('') : `<div class="card" style="align-items:center;text-align:center">${mascotFor(mascotIndex(), 64)}<span class="muted small">대화법, 연애, 재테크, 자기관리·계발 링크나 메모를 저장해두세요</span></div>`}`;
@@ -804,8 +804,14 @@ const actions = {
   calMonth: (el) => { const [y, m] = ui.calMonth.split('-').map(Number); const d = new Date(y, m - 1 + Number(el.dataset.d), 1); ui.calMonth = ymd(d).slice(0, 7); render(); },
   libCat: (el) => { ui.libCat = el.dataset.k; render(); },
   libTab: (el) => { ui.libTab = el.dataset.k; render(); },
-  libToggle: (el) => { const x = S.library.find((y) => y.id === el.dataset.id); if (x) { x.done = !x.done; save(); render(); } },
+  libToggle: (el) => { const x = S.library.find((y) => y.id === el.dataset.id); if (x) { x.done = !x.done; save(); closeSheet(); render(); } },
   libMenu: (el) => { const x = S.library.find((y) => y.id === el.dataset.id); if (!x) return; const memo = x.kind === 'memo'; sheet(`<h2>${memo ? '메모 고치기' : '링크 고치기'}</h2><form data-form="libEdit" data-id="${x.id}" class="col" style="gap:10px">${memo ? `<label class="lbl" for="l-text">메모</label><textarea id="l-text" name="text" class="field" rows="6" required>${esc(x.text)}</textarea>` : `<label class="lbl" for="l-title">제목</label><input id="l-title" name="title" class="field" value="${esc(x.title)}" required>`}<label class="lbl" for="l-cat">분류</label><select id="l-cat" name="cat" class="field">${Object.keys(LIB).map((k) => `<option ${k === x.cat ? 'selected' : ''}>${k}</option>`).join('')}</select><button class="btn" type="submit">저장</button><button class="btn danger" type="button" data-act="libDel" data-id="${x.id}">삭제</button></form>`); },
+  libOpen: (el) => { const x = S.library.find((y) => y.id === el.dataset.id); if (!x) return; const [tint, ink] = LIB[x.cat] || LIB['대화법'];
+    sheet(`<div class="row" style="gap:10px"><span class="lib-icon" style="background:${tint};color:${ink}">${x.video ? I.video : I.doc}</span><div class="col grow"><h2 style="font-size:20px">${esc(x.title)}</h2><span class="xs muted">${esc(x.cat)} · ${md(x.at)} 저장</span></div></div>
+      <label class="lbl" for="l-link">저장한 링크</label><textarea id="l-link" class="field" rows="3" readonly style="font-size:13px">${esc(x.url)}</textarea>
+      <a class="btn" href="${esc(x.url)}" target="_blank" rel="noopener noreferrer" style="display:flex;align-items:center;justify-content:center;text-decoration:none;color:#fff">${x.video ? '영상 보러 가기' : '링크 열기'}</a>
+      <div class="row" style="gap:8px"><button class="btn ghost grow" data-act="libCopy" data-id="${x.id}">링크 복사</button><button class="btn ghost grow" data-act="libToggle" data-id="${x.id}">${x.done ? '체크 해제' : '봤어요 체크'}</button><button class="btn ghost grow" data-act="libMenu" data-id="${x.id}">수정</button></div>`); },
+  libCopy: async (el) => { const x = S.library.find((y) => y.id === el.dataset.id); if (!x) return; try { await navigator.clipboard.writeText(x.url); flash('링크를 복사했어요'); } catch (e) { const t = document.getElementById('l-link'); if (t) { t.focus(); t.select(); try { document.execCommand('copy'); flash('링크를 복사했어요'); } catch (e2) { flash('링크를 길게 눌러 복사해 주세요'); } } } },
   libMode: (el) => { ui.libMode = el.dataset.k; render(); },
   libDel: (el) => { S.library = S.library.filter((y) => y.id !== el.dataset.id); save(); closeSheet(); render(); },
   mood: (el) => { const d = diaryOf(el.dataset.date || today()); d.mood = d.mood === el.dataset.mood ? '' : el.dataset.mood; save(); render(); },
@@ -936,10 +942,14 @@ document.addEventListener('submit', (ev) => {
     S.library.unshift({ id: uid(), kind: 'memo', text, cat: ui.libCat, done: false, at: today() });
     save(); render(); flash('메모를 저장했어요');
   } else if (kind === 'libAdd') {
-    let url = v('url'); if (!url) return; if (!/^https?:\/\//i.test(url)) url = 'https://' + url;
+    const raw = v('url'); if (!raw) return;
+    const found = raw.match(/https?:\/\/[^\s<>"']+/i) || raw.match(/(?:www\.)?[a-z0-9-]+(?:\.[a-z0-9-]+)+\/?[^\s<>"']*/i);
+    if (!found) { flash('링크를 찾지 못했어요. 주소를 다시 붙여넣어 주세요'); return; }
+    let url = found[0].replace(/[),.]+$/, ''); if (!/^https?:\/\//i.test(url)) url = 'https://' + url;
+    const shareTitle = raw.replace(found[0], '').replace(/\s+/g, ' ').trim().slice(0, 80); // 공유 문구에 붙은 제목
     let host = url; try { host = new URL(url).hostname.replace(/^www\./, ''); } catch (e) { /* 주소 그대로 */ }
     const video = /youtu|vimeo|tiktok|instagram\.com\/reel|tv\.naver|chzzk/i.test(url);
-    S.library.unshift({ id: uid(), url, host, title: v('title') || host, cat: ui.libCat, video, done: false, at: today() });
+    S.library.unshift({ id: uid(), url, host, title: v('title') || shareTitle || host, cat: ui.libCat, video, done: false, at: today() });
     save(); render(); flash('보관함에 저장했어요');
   } else if (kind === 'libEdit') {
     const x = S.library.find((y) => y.id === f.dataset.id); if (x) { if (x.kind === 'memo') x.text = String(fd.get('text') || '').trim() || x.text; else x.title = v('title') || x.title; x.cat = v('cat') || x.cat; }
