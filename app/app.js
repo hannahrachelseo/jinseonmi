@@ -91,15 +91,19 @@ function dayRate(d) {
 const appDay = () => ymd(new Date(Date.now() - 7 * 3600 * 1000));
 function cleanupExpired() {
   const cut = appDay(); let n = 0;
-  S.dropped = S.dropped || {};
-  S.tasks = S.tasks.filter((x) => {
-    if (x.done || x.moved || x.date >= cut) return true;
-    const day = (S.dropped[x.date] = S.dropped[x.date] || {});
-    day[x.cat] = (day[x.cat] || 0) + 1; n++;
-    return false;
-  });
+  for (const x of S.tasks) if (!x.done && !x.moved && !x.expired && x.date < cut) { x.expired = true; n++; } // 오늘 화면에서만 정리, 캘린더에선 그대로 고칠 수 있어요
   if (n) save();
   return n;
+}
+/* 지난 날짜를 고치면 그날부터 포인트·연속 기록을 다시 계산 */
+function resettleFrom(d) {
+  const t = today(); if (d >= t) return;
+  const start = addDays(d, -3);
+  for (const [k, e] of Object.entries(S.ledger)) if (!k.startsWith('goal:') && e.d >= start) delete S.ledger[k];
+  for (const [hid, m] of Object.entries(S.missions)) if (m.date > start) delete S.missions[hid];
+  const prev = addDays(start, -1);
+  S.lastSettled = prev < S.createdAt ? null : prev;
+  settle();
 }
 function streakEnding(h, d) {
   let n = 0;
@@ -272,7 +276,7 @@ function vToday() {
       const miss = missRun(h, addDays(t, -1));
       list.push({ kind: 'habit', id: h.id, cat: k, label: h.name, done, meta: rest ? '쉬는 날 · 기록은 지켜져요' : S.missions[h.id] ? '회복 미션 중 · 오늘 하면 +25P' : s > 0 ? `매일 · ${s}일 연속` : miss > 0 ? `매일 · ${miss}일째 쉬는 중` : '매일' });
     }
-    for (const x of S.tasks.filter((x) => x.cat === k && x.date < t && !x.done)) list.push({ kind: 'task', id: x.id, cat: k, label: x.title, done: false, overdue: true, meta: `밀린 일 · ${md(x.date)}` });
+    for (const x of S.tasks.filter((x) => x.cat === k && x.date < t && !x.done && !x.expired)) list.push({ kind: 'task', id: x.id, cat: k, label: x.title, done: false, overdue: true, meta: `밀린 일 · ${md(x.date)}` });
     for (const x of tasksOn(t).filter((x) => x.cat === k)) list.push({ kind: 'task', id: x.id, cat: k, label: x.title, done: x.done, meta: x.moved ? `${x.moved}번 미룬 일` : '오늘' });
     const hs = rest ? [] : habitsOn(t).filter((h) => h.cat === k); const ts = tasksOn(t).filter((x) => x.cat === k);
     byCat[k] = { list, done: hs.filter((h) => isDone(h.id, t)).length + ts.filter((x) => x.done).length, total: hs.length + ts.length };
@@ -560,9 +564,11 @@ function vCalendar() {
     <div class="row xs muted" style="justify-content:center;gap:14px">${CAT_KEYS.map((k) => `<span class="row" style="gap:4px"><i style="width:8px;height:8px;border-radius:50%;background:${CATS[k].strong}"></i>${CATS[k].ko}</span>`).join('')}</div>
   </section>
   <section class="card">
-    <div class="row between"><h2>${longDate(sel)}</h2><span class="small muted">${tag} · ${list.length}개</span></div>
-    ${list.length ? list.map((x) => { const c = CATS[x.cat]; return `<div class="item" style="background:${c.tint}"><span class="hand" style="font-size:18px;width:22px;color:${c.ink}">${c.ko}</span><button class="label" data-act="taskMenu" data-id="${x.id}"><span class="t" style="${x.done ? 'text-decoration:line-through;color:var(--muted)' : ''}">${esc(x.title)}</span></button><button class="icon-btn sm" style="background:rgba(255,255,255,.75)" data-act="delTask" data-id="${x.id}" aria-label="${esc(x.title)} 삭제">${I.x}</button></div>`; }).join('') : '<div class="empty" style="background:var(--field)">아직 계획이 없어요. 아래에서 미리 적어두세요</div>'}
-    ${S.habits.length ? `<span class="xs muted">습관 ${S.habits.length}개는 매일 자동으로 들어가요</span>` : ''}
+    <div class="row between"><h2>${longDate(sel)}</h2><span class="small muted">${tag}</span></div>
+    ${sel <= t ? (() => { const r = dayRate(sel); return r.total ? `<div class="row" style="gap:10px"><div class="track grow" style="background:var(--soft);height:10px"><i style="height:10px;width:${Math.round(r.done / r.total * 100)}%;background:var(--primary)"></i></div><b class="small">${r.done}/${r.total} · ${Math.round(r.done / r.total * 100)}%</b></div>` : ''; })() : ''}
+    ${sel <= t && habitsOn(sel).length ? `<span class="lbl">습관${isRest(sel) ? ' · 쉬는 날' : ''}</span>${habitsOn(sel).map((h) => { const c = CATS[h.cat]; const d = isDone(h.id, sel); return `<div class="item ${d ? 'done' : ''}" style="background:${c.tint}"><button class="check" style="${d ? `background:${c.strong};border-color:${c.strong}` : ''}" data-act="calHabit" data-id="${h.id}" aria-pressed="${d}" aria-label="${esc(h.name)} ${d ? '완료 취소' : '완료 체크'}">${d ? I.check : ''}</button><span class="label"><span class="t">${esc(h.name)}</span><span class="meta"><span class="tag" style="background:#fff;color:${c.ink}">${c.ko}</span>습관</span></span></div>`; }).join('')}` : ''}
+    <span class="lbl">할 일 ${list.length}개</span>
+    ${list.length ? list.map((x) => { const c = CATS[x.cat]; return `<div class="item ${x.done ? 'done' : ''}" style="background:${c.tint}"><button class="check" style="${x.done ? `background:${c.strong};border-color:${c.strong}` : ''}" data-act="calTask" data-id="${x.id}" aria-pressed="${!!x.done}" aria-label="${esc(x.title)} ${x.done ? '완료 취소' : '완료 체크'}">${x.done ? I.check : ''}</button><button class="label" data-act="taskMenu" data-id="${x.id}"><span class="t">${esc(x.title)}</span><span class="meta"><span class="tag" style="background:#fff;color:${c.ink}">${c.ko}</span>${x.expired && !x.done ? '못 한 일 · 지금 체크해도 돼요' : x.moved ? `${x.moved}번 미룬 일` : ''}</span></button><button class="icon-btn sm" style="background:rgba(255,255,255,.75)" data-act="delTask" data-id="${x.id}" aria-label="${esc(x.title)} 삭제">${I.x}</button></div>`; }).join('') : '<div class="empty" style="background:var(--field)">이 날 할 일이 없어요. 아래에서 추가할 수 있어요</div>'}
     <form data-form="calAdd" class="col" style="gap:10px;border-top:1px dashed var(--line);padding-top:12px">
       <label class="lbl" for="cal-title">이 날 할 일 미리 추가</label>
       <input id="cal-title" name="title" class="field" placeholder="예: 헬스장 등록 상담" autocomplete="off" required>
@@ -829,6 +835,8 @@ const actions = {
   addPlan: () => planSheet(null),
   planMenu: (el) => { const p = (S.plans || []).find((x) => x.id === el.dataset.id); if (p) planSheet(p); },
   delPlan: (el) => { const p = (S.plans || []).find((x) => x.id === el.dataset.id); if (!el.dataset.confirm) return confirmSheet(`‘${p ? p.title : ''}’ 계획을 삭제할까요?`, 'delPlan', el.dataset.id); S.plans = S.plans.filter((x) => x.id !== el.dataset.id); save(); closeSheet(); render(); },
+  calHabit: (el) => { const d = ui.calSel; if (d > today()) return; setHabit(el.dataset.id, d, !isDone(el.dataset.id, d)); vibrate(); resettleFrom(d); save(); render(); },
+  calTask: (el) => { const x = S.tasks.find((y) => y.id === el.dataset.id); if (!x) return; x.done = !x.done; vibrate(); resettleFrom(x.date); save(); render(); },
   raceTab: (el) => { ui.raceTab = el.dataset.k; render(); },
   addGoal: (el) => goalSheet(null, el.dataset.k),
   goalMenu: (el) => { const g = S.goals.find((x) => x.id === el.dataset.id); if (g) goalSheet(g); },
@@ -910,7 +918,7 @@ document.addEventListener('submit', (ev) => {
   const fd = new FormData(f); const v = (k) => String(fd.get(k) || '').trim();
   if (kind === 'task') {
     const title = v('title'); const date = v('date') || today(); if (!title) return;
-    if (f.dataset.id) { const x = S.tasks.find((y) => y.id === f.dataset.id); if (x) Object.assign(x, { title, date, cat: sheetCat }); }
+    if (f.dataset.id) { const x = S.tasks.find((y) => y.id === f.dataset.id); if (x) { const old = x.date; Object.assign(x, { title, date, cat: sheetCat }); if (date >= today()) delete x.expired; resettleFrom(old < date ? old : date); } }
     else S.tasks.push({ id: uid(), title, cat: sheetCat, date, done: false });
     save(); closeSheet(); render();
   } else if (kind === 'plan') {
@@ -1002,7 +1010,7 @@ function persist() { try { navigator.storage && navigator.storage.persist && nav
 
 /* 날짜가 바뀌면(자정·오전 7시) 자동 정산·새로고침 */
 let lastDay = today(), lastMascot = mascotIndex();
-function rollover() { autoBackup(0); lastDay = today(); lastMascot = mascotIndex(); ui.calSel = today(); const n = cleanupExpired(); settle(); render(); if (n) flash(`어제 못 한 일 ${n}개를 정리했어요`); }
+function rollover() { autoBackup(0); lastDay = today(); lastMascot = mascotIndex(); ui.calSel = today(); const n = cleanupExpired(); settle(); render(); if (n) flash(`어제 못 한 일 ${n}개는 캘린더에 남겨뒀어요`); }
 setInterval(() => { if (today() !== lastDay || mascotIndex() !== lastMascot) rollover(); }, 30000);
 document.addEventListener('visibilitychange', () => { if (document.hidden) autoBackup(5); });
 document.addEventListener('visibilitychange', () => { if (!document.hidden && (today() !== lastDay || mascotIndex() !== lastMascot)) rollover(); });
@@ -1011,7 +1019,7 @@ window.addEventListener('hashchange', () => { const v = location.hash.slice(1); 
 const cleaned = cleanupExpired();
 settle();
 render();
-if (cleaned) flash(`어제 못 한 일 ${cleaned}개를 정리했어요`);
+if (cleaned) flash(`어제 못 한 일 ${cleaned}개는 캘린더에 남겨뒀어요`);
 setTimeout(() => autoBackup(60), 4000);
 setInterval(() => autoBackup(30), 15 * 60e3);
 if (!NATIVE && 'serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('./sw.js').catch(() => {});
