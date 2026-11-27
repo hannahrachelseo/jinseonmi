@@ -235,3 +235,13 @@ i.lg{width:10px;height:10px;border-radius:3px;display:inline-block}
 .pl-label{position:absolute;bottom:9px;font-size:11px;font-weight:700;white-space:nowrap;max-width:60%;overflow:hidden;text-overflow:ellipsis}
 .lib-url{color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block;max-width:100%}
 .back-pill{align-self:flex-start;display:flex;align-items:center;gap:2px;border:none;background:#fff;color:#5C4536;border-radius:999px;min-height:40px;padding:0 14px 0 8px;font-weight:700;font-size:13px;box-shadow:var(--shadow);margin-bottom:-6px}
+
+.mstrip{display:flex;gap:6px;overflow-x:auto;padding:2px 2px 4px;scrollbar-width:none}
+.mstrip::-webkit-scrollbar{display:none}
+.mstrip button{flex-shrink:0;border:none;border-radius:14px;background:var(--soft);color:#5C4536;min-width:58px;min-height:44px;padding:4px 8px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0}
+.mstrip button b{font-size:12px}.mstrip button span{font-size:10px;opacity:.8}
+.mstrip button.on{background:var(--dark);color:#fff}
+.mo-row{border:none;background:#fff;border-radius:18px;padding:12px 14px;display:flex;flex-direction:column;gap:8px;text-align:left;width:100%}
+.mo-row.now{box-shadow:inset 0 0 0 2px var(--primary)}
+.mo-goals{display:flex;flex-wrap:wrap;gap:6px}
+.mo-goal{font-size:12px;border-radius:10px;padding:3px 8px}

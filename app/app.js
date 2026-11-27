@@ -345,60 +345,71 @@ const SAY = (p) => (p >= 100 ? '완주!' : p >= 75 ? '조금만 더!' : p >= 50 
 function runnerSvg(i, legs, size) {
   return `<svg width="${size}" height="${Math.round(size * 1.1)}" viewBox="0 0 100 110" aria-hidden="true"><ellipse cx="50" cy="104" rx="26" ry="5" fill="#3B2A20" opacity=".12"/><path d="M38 86l-10 16M62 86l12 14" stroke="${legs}" stroke-width="9" stroke-linecap="round"/>${MASCOTS[i].svg}</svg>`;
 }
+const monthAdd = (st, n) => { const x = parse(st); return ymd(new Date(x.getFullYear(), x.getMonth() + n, 1)); };
+const monthName = (st) => { const x = parse(st); const t = today(); return `${x.getFullYear() !== Number(t.slice(0, 4)) ? `${String(x.getFullYear()).slice(2)}년 ` : ''}${x.getMonth() + 1}월`; };
+const upcomingMonths = () => Array.from({ length: 12 }, (_, i) => monthAdd(pStart('month'), i)); // 이번 달부터 12개월
 function raceLane(g, n) {
   const c = CATS[g.cat]; const t = today();
   const p = Math.min(100, Math.round((g.count / g.target) * 100));
   const end = pEnd(g.period, g.start);
   const total = Math.round((parse(end) - parse(g.start)) / 864e5) + 1;
-  const passed = Math.min(total, Math.round((parse(t) - parse(g.start)) / 864e5) + 1);
+  const future = g.start > t;
+  const passed = Math.max(0, Math.min(total, Math.round((parse(t) - parse(g.start)) / 864e5) + 1));
   const pace = Math.round((passed / total) * 100);
   const mi = (mascotIndex() + n) % 10;
-  const status = p >= 100 ? `완주 메달 +${goalPts(g)}P` : p >= pace - 5 ? '페이스 좋아요' : '조금 뒤처졌어요';
+  const status = future ? `${monthName(g.start)} 1일에 출발해요` : p >= 100 ? `완주 메달 +${goalPts(g)}P` : p >= pace - 5 ? '페이스 좋아요' : '조금 뒤처졌어요';
   return `<div class="lane">
     <div class="lane-head"><button class="lane-title" data-act="goalMenu" data-id="${g.id}"><b class="tag" style="background:${c.tint};color:${c.ink}">${c.ko}</b>${esc(g.title)}</button>
       <span class="lane-n">${g.count}/${g.target}${esc(g.unit || '')}</span>
       <button class="lane-btn" data-act="goalMinus" data-id="${g.id}" aria-label="${esc(g.title)} 1 빼기" ${g.count <= 0 ? 'disabled' : ''}>−</button>
-      <button class="lane-btn plus" style="background:${c.strong}" data-act="goalPlus" data-id="${g.id}" aria-label="${esc(g.title)} 1 더하기">+1</button></div>
+      ${future ? '' : `<button class="lane-btn plus" style="background:${c.strong}" data-act="goalPlus" data-id="${g.id}" aria-label="${esc(g.title)} 1 더하기">+1</button>`}</div>
     <div class="rtrack" aria-label="${esc(g.title)} 진행 ${p}%, ${status}">
       <i class="dirt"></i><i class="dash"></i>
       ${[25, 50, 75].map((x) => `<span class="star" style="left:calc(${x}% * .86 + 6px);color:${p >= x ? '#E0A800' : '#FFF8EE'}">★</span>`).join('')}
-      ${p < 100 ? `<span class="pace" style="left:calc(${pace}% * .84)" title="오늘까지 이만큼 와 있으면 딱 좋아요">⚑</span>` : ''}
+      ${p < 100 && !future ? `<span class="pace" style="left:calc(${pace}% * .84)" title="오늘까지 이만큼 와 있으면 딱 좋아요">⚑</span>` : ''}
       <i class="finish"></i>
       <div class="runner ${ui.hop === g.id ? 'hop' : ''} ${p >= 100 ? 'done' : ''}" style="left:calc(${p}% * .78)">
-        <span class="say">${SAY(p)}</span>${runnerSvg(mi, c.strong, 38)}
+        <span class="say">${future ? '준비 운동 중~' : SAY(p)}</span>${runnerSvg(mi, c.strong, 38)}
       </div>
     </div>
-    <span class="lane-status" style="color:${p >= 100 ? '#7A5600' : p >= pace - 5 ? '#3F6B26' : '#8F3F0A'}">${status}</span>
+    <span class="lane-status" style="color:${future ? '#5C4536' : p >= 100 ? '#7A5600' : p >= pace - 5 ? '#3F6B26' : '#8F3F0A'}">${status}</span>
   </div>`;
 }
 function raceBanner() {
-  const p = ui.raceTab || 'week'; const st = pStart(p); const end = pEnd(p, st); const t = today();
+  const p = ui.raceTab || 'week'; const t = today();
+  if (p === 'month' && (!ui.marathonMonth || ui.marathonMonth < pStart('month'))) ui.marathonMonth = pStart('month');
+  const st = p === 'month' ? ui.marathonMonth : pStart(p); const end = pEnd(p, st); const isNow = st === pStart(p);
   const list = goalsOf(p, st);
-  const left = Math.round((parse(end) - parse(t)) / 864e5);
+  const left = isNow ? Math.round((parse(end) - parse(t)) / 864e5) : Math.round((parse(st) - parse(t)) / 864e5);
   const doneN = list.filter((g) => g.count >= g.target).length;
   const prev = goalsOf(p, pPrev(p, st)).filter((g) => g.count < g.target && !g.carried);
-  const showCarry = prev.length && !S.goalSkip[p + st];
+  const showCarry = isNow && prev.length && !S.goalSkip[p + st];
+  const monthStrip = p === 'month' ? `<div class="mstrip" role="tablist" aria-label="달 선택">${upcomingMonths().map((m) => { const gs = goalsOf('month', m); const d = gs.filter((g) => g.count >= g.target).length; return `<button role="tab" aria-selected="${m === st}" class="${m === st ? 'on' : ''}" data-act="pickMonth" data-m="${m}"><b>${monthName(m)}</b><span>${gs.length ? (m === pStart('month') ? `${d}/${gs.length}` : `${gs.length}개`) : '–'}</span></button>`; }).join('')}</div>` : '';
   return `<section class="race" aria-label="목표 레이스">
     <div class="row between" style="margin:0 4px">
-      <div class="row" role="tablist" aria-label="기간" style="gap:6px">${[['week', '이번 주 운동회'], ['month', `${parse(st).getMonth() + 1}월 마라톤`]].map(([k, l]) => `<button role="tab" aria-selected="${p === k}" class="race-tab ${p === k ? 'on' : ''}" data-act="raceTab" data-k="${k}">${l}</button>`).join('')}</div>
-      <span class="pill" style="background:var(--gold-bg);color:var(--gold);font-size:11px">D-${left} · ${doneN}/${list.length} 완주</span>
+      <div class="row" role="tablist" aria-label="기간" style="gap:6px">${[['week', '이번 주 운동회'], ['month', `${parse(pStart('month')).getMonth() + 1}월 마라톤`]].map(([k, l]) => `<button role="tab" aria-selected="${p === k}" class="race-tab ${p === k ? 'on' : ''}" data-act="raceTab" data-k="${k}">${l}</button>`).join('')}</div>
+      <span class="pill" style="background:var(--gold-bg);color:var(--gold);font-size:11px">${isNow ? `D-${left} · ${doneN}/${list.length} 완주` : `${monthName(st)} · 시작까지 ${left}일`}</span>
     </div>
+    ${monthStrip}
     ${showCarry ? `<div class="toast" style="border:none"><span>${p === 'week' ? '지난주' : '지난달'} 못 끝낸 목표 ${prev.length}개, 다시 도전할까요?</span><span class="row" style="gap:6px"><button class="mini" style="background:var(--peach);color:var(--primary)" data-act="goalCarry" data-k="${p}">도전!</button><button class="mini" data-act="goalSkip" data-k="${p}">괜찮아요</button></span></div>` : ''}
     <div class="race-field">
-      ${list.length ? list.map((g, n) => raceLane(g, n)).join('') : `<div class="race-empty">${runnerSvg(mascotIndex(), '#9C4A2A', 54)}<span>${p === 'week' ? '이번 주' : '이번 달'} 목표를 세우고 친구랑 같이 달려요!<br><span class="xs">진·선·미·일·기타마다 여러 개 넣을 수 있어요</span></span></div>`}
-      <button class="race-add" data-act="addGoal" data-k="${p}">+ ${p === 'week' ? '주간' : '월간'} 목표 추가</button>
+      ${list.length ? list.map((g, n) => raceLane(g, n)).join('') : `<div class="race-empty">${runnerSvg(mascotIndex(), '#9C4A2A', 54)}<span>${p === 'week' ? '이번 주' : isNow ? '이번 달' : monthName(st)} 목표를 세우고 친구랑 같이 달려요!<br><span class="xs">진·선·미·일·기타마다 여러 개 넣을 수 있어요</span></span></div>`}
+      <button class="race-add" data-act="addGoal" data-k="${p}">+ ${p === 'week' ? '주간' : `${monthName(st)}`} 목표 추가</button>
+      ${p === 'month' ? '<button class="race-add" style="border-style:solid;background:#fff" data-act="monthOverview">월별 목표 한눈에 보기</button>' : ''}
     </div>
   </section>`;
 }
 function goalSheet(g, period) {
   sheetCat = g ? g.cat : 'jin';
   const p = g ? g.period : period;
-  sheet(`<h2>${g ? '목표 고치기' : p === 'week' ? '이번 주 목표' : '이번 달 목표'}</h2>
+  const selM = g ? g.start : (ui.marathonMonth || pStart('month'));
+  sheet(`<h2>${g ? '목표 고치기' : p === 'week' ? '이번 주 목표' : '월간 목표'}</h2>
   <form data-form="goal" data-id="${g ? g.id : ''}" data-period="${p}" class="col" style="gap:10px">
     <label class="lbl" for="g-title">목표</label><input id="g-title" name="title" class="field" value="${g ? esc(g.title) : ''}" placeholder="예: 책 읽기" required autocomplete="off">
     <span class="lbl">영역</span><div class="cats" role="radiogroup" aria-label="영역">${CAT_KEYS.map((k) => catOpt(k, sheetCat === k, 'sheetCat')).join('')}</div>
     <div class="row" style="gap:10px"><div class="col grow" style="gap:6px"><label class="lbl" for="g-target">몇 번(개)?</label><input id="g-target" name="target" type="number" inputmode="numeric" min="1" max="9999" class="field" value="${g ? g.target : 3}" required></div>
       <div class="col grow" style="gap:6px"><label class="lbl" for="g-unit">단위</label><input id="g-unit" name="unit" class="field" value="${g ? esc(g.unit || '') : '번'}" placeholder="번, 권, 만원" maxlength="6"></div></div>
+    ${p === 'month' ? `<label class="lbl" for="g-month">어느 달 목표?</label><select id="g-month" name="month" class="field">${upcomingMonths().concat(g && !upcomingMonths().includes(g.start) ? [g.start] : []).map((m) => `<option value="${m}" ${m === selM ? 'selected' : ''}>${monthName(m)}${m === pStart('month') ? ' (이번 달)' : ''}</option>`).join('')}</select>` : ''}
     <button class="btn" type="submit">${g ? '저장' : '출발!'}</button>
     ${g ? `<button class="btn danger" type="button" data-act="delGoal" data-id="${g.id}">삭제</button>` : ''}
   </form>`);
@@ -854,6 +865,14 @@ const actions = {
   calHabit: (el) => { const d = ui.calSel; if (d > today()) return; setHabit(el.dataset.id, d, !isDone(el.dataset.id, d)); vibrate(); resettleFrom(d); save(); render(); },
   calTask: (el) => { const x = S.tasks.find((y) => y.id === el.dataset.id); if (!x) return; x.done = !x.done; vibrate(); resettleFrom(x.date); save(); render(); },
   back: () => goBack(),
+  pickMonth: (el) => { ui.marathonMonth = el.dataset.m; render(); },
+  monthOverview: () => {
+    const months = upcomingMonths(); const past = [...new Set((S.goals || []).filter((g) => g.period === 'month' && g.start < pStart('month')).map((g) => g.start))].sort().reverse().slice(0, 6);
+    const row = (m) => { const gs = goalsOf('month', m); const now = m === pStart('month'); const fut = m > pStart('month');
+      return `<button class="mo-row ${now ? 'now' : ''}" data-act="openMonthGoals" data-m="${m}"><div class="row between"><b class="hand" style="font-size:20px">${monthName(m)}${now ? ' · 이번 달' : ''}</b><span class="xs muted">${gs.length ? (fut ? `목표 ${gs.length}개 예정` : `${gs.filter((g) => g.count >= g.target).length}/${gs.length} 완주`) : '아직 목표 없음'}</span></div>
+        ${gs.length ? `<div class="mo-goals">${gs.map((g) => { const c = CATS[g.cat]; const pc = Math.min(100, Math.round(g.count / g.target * 100)); return `<span class="mo-goal" style="background:${c.tint};color:${c.ink}"><b>${c.ko}</b> ${esc(g.title)} ${g.target}${esc(g.unit || '')}${fut ? '' : ` · ${pc}%`}</span>`; }).join('')}</div>` : ''}</button>`; };
+    sheet(`<h2>월별 목표 한눈에</h2><span class="small muted">달을 누르면 그 달 마라톤으로 가요</span>${months.map(row).join('')}${past.length ? `<span class="lbl" style="margin-top:6px">지난 달</span>${past.map(row).join('')}` : ''}`); },
+  openMonthGoals: (el) => { const m = el.dataset.m; ui.raceTab = 'month'; ui.marathonMonth = m < pStart('month') ? pStart('month') : m; closeSheet(); render(); if (m < pStart('month')) flash('지난 달 기록은 캘린더 1년 보기에 있어요'); },
   raceTab: (el) => { ui.raceTab = el.dataset.k; render(); },
   addGoal: (el) => goalSheet(null, el.dataset.k),
   goalMenu: (el) => { const g = S.goals.find((x) => x.id === el.dataset.id); if (g) goalSheet(g); },
@@ -950,8 +969,8 @@ document.addEventListener('submit', (ev) => {
   } else if (kind === 'goal') {
     const title = v('title'); const target = Math.max(1, Math.min(9999, parseInt(v('target'), 10) || 1)); const unit = v('unit').slice(0, 6); if (!title) return;
     S.goals = S.goals || [];
-    if (f.dataset.id) { const g = S.goals.find((x) => x.id === f.dataset.id); if (g) { Object.assign(g, { title, target, unit, cat: sheetCat }); if (goalAward(g)) flash(`완주! +${goalPts(g)}P`); } }
-    else { const p = f.dataset.period || 'week'; S.goals.push({ id: uid(), period: p, start: pStart(p), cat: sheetCat, title, target, unit, count: 0 }); ui.raceTab = p; }
+    if (f.dataset.id) { const g = S.goals.find((x) => x.id === f.dataset.id); if (g) { Object.assign(g, { title, target, unit, cat: sheetCat }); if (g.period === 'month' && /^\d{4}-\d{2}-01$/.test(v('month')) && g.count === 0) { g.start = v('month'); ui.marathonMonth = g.start; } if (goalAward(g)) flash(`완주! +${goalPts(g)}P`); } }
+    else { const p = f.dataset.period || 'week'; const start = p === 'month' && /^\d{4}-\d{2}-01$/.test(v('month')) ? v('month') : pStart(p); S.goals.push({ id: uid(), period: p, start, cat: sheetCat, title, target, unit, count: 0 }); ui.raceTab = p; if (p === 'month') ui.marathonMonth = start; }
     save(); closeSheet(); render();
   } else if (kind === 'calAdd') {
     const title = v('title'); if (!title) return;
