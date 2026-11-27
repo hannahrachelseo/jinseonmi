@@ -218,7 +218,16 @@ const ui = {
 };
 const NAV = [['today', '오늘'], ['calendar', '캘린더'], ['habits', '습관'], ['stats', '성취율'], ['library', '보관함'], ['challenge', '도전']];
 
-function go(view) { ui.view = view; history.replaceState(null, '', '#' + view); render(); window.scrollTo(0, 0); }
+let navDepth = 0; // 앱 안에서 이동한 횟수 (뒤로가기용)
+function go(view) {
+  if (view === ui.view) { window.scrollTo(0, 0); return; }
+  closeSheet(true);
+  ui.view = view; navDepth++; history.pushState({ v: view }, '', '#' + view); render(); window.scrollTo(0, 0);
+}
+function goBack() {
+  if (document.getElementById('sheet-root').innerHTML) { closeSheet(); return; }
+  if (navDepth > 0) history.back(); else if (ui.view !== 'today') { ui.view = 'today'; history.replaceState({ v: 'today' }, '', '#today'); render(); window.scrollTo(0, 0); }
+}
 let flashTimer;
 function flash(msg) { ui.flash = msg; render(); clearTimeout(flashTimer); flashTimer = setTimeout(() => { ui.flash = ''; render(); }, 2200); }
 
@@ -241,7 +250,8 @@ function render() {
   const fn = views[ui.view] || vToday;
   const active = document.activeElement;
   const keep = active && active.id && app.contains(active) ? { id: active.id, s: active.selectionStart, e: active.selectionEnd } : null;
-  app.innerHTML = fn() + (ui.flash ? `<div class="toast" role="status" style="position:fixed;left:50%;transform:translateX(-50%);bottom:calc(96px + env(safe-area-inset-bottom));z-index:30;box-shadow:var(--shadow)">${esc(ui.flash)}</div>` : '') + footer();
+  const backBar = ['calendar', 'habits', 'stats', 'library'].includes(ui.view) ? `<button class="back-pill" data-act="back" aria-label="뒤로가기">${I.left}<span>뒤로</span></button>` : '';
+  app.innerHTML = backBar + fn() + (ui.flash ? `<div class="toast" role="status" style="position:fixed;left:50%;transform:translateX(-50%);bottom:calc(96px + env(safe-area-inset-bottom));z-index:30;box-shadow:var(--shadow)">${esc(ui.flash)}</div>` : '') + footer();
   if (keep) { const el = document.getElementById(keep.id); if (el) { el.focus(); try { el.setSelectionRange(keep.s, keep.e); } catch (e) { /* 일부 입력칸 제외 */ } } }
   document.getElementById('nav').innerHTML = `<div class="bar">${NAV.map(([k, l]) => `<button data-act="go" data-view="${k}" class="${ui.view === k ? 'on' : ''}" ${ui.view === k ? 'aria-current="page"' : ''}><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${I.nav[k]}</svg>${l}</button>`).join('')}</div>`;
 }
@@ -718,7 +728,7 @@ function vChallenge() {
   const restLeft = REST_PER_MONTH - restUsedThisMonth();
   const hist = [...lv.items.map((e) => ({ ...e, live: true })), ...Object.values(S.ledger).sort((a, b) => (a.d < b.d ? 1 : -1))].slice(0, 12);
   return `
-  <header class="row"><button class="icon-btn" data-act="go" data-view="today" aria-label="뒤로">${I.left}</button><h1>도전 & 회복</h1></header>
+  <header class="row"><button class="icon-btn" data-act="back" aria-label="뒤로">${I.left}</button><h1>도전 & 회복</h1></header>
   <section class="summary" style="border-radius:30px">${mascotFor(mi, 72)}
     <div class="col grow" style="gap:4px"><span class="small" style="color:var(--cream-text)">모은 포인트</span><span class="hand" style="font-size:42px;line-height:1">${totalPoints().toLocaleString('ko-KR')}P</span>
       <span class="xs" style="color:var(--cream-text);line-height:1.5">하루 100% +${PTS.full}P · 7일 연속 +${PTS.streak7}P<br>주간 목표 완주 +${PTS.goalWeek}P · 월간 완주 +${PTS.goalMonth}P<br>3일 미수행 ${PTS.miss3}P · 회복 미션 +${PTS.recover}P</span></div></section>
@@ -745,17 +755,23 @@ function vChallenge() {
 function vFriends() {
   const mi = mascotIndex();
   return `
-  <header class="row"><button class="icon-btn" data-act="go" data-view="today" aria-label="뒤로">${I.left}</button><div class="col"><h1>매일 바뀌는 친구들</h1><span class="small muted">매일 아침 7시에 바뀌어요 · 내일은 ${MASCOTS[(mi + 1) % 10].name}</span></div></header>
+  <header class="row"><button class="icon-btn" data-act="back" aria-label="뒤로">${I.left}</button><div class="col"><h1>매일 바뀌는 친구들</h1><span class="small muted">매일 아침 7시에 바뀌어요 · 내일은 ${MASCOTS[(mi + 1) % 10].name}</span></div></header>
   <div class="friends">${MASCOTS.map((m, i) => `<div class="friend ${i === mi ? 'today' : ''}">${mascotFor(i, 84)}<span class="hand" style="font-size:22px;line-height:1">${m.name}</span><span class="small muted">${m.desc}</span>${i === mi ? '<span class="pill" style="background:var(--primary);color:#fff;font-size:11px">오늘의 친구</span>' : ''}</div>`).join('')}</div>`;
 }
 
 /* ---------- 시트(팝업) ---------- */
+let sheetPopSkip = false;
 function sheet(html) {
   const root = document.getElementById('sheet-root');
+  if (!root.innerHTML) history.pushState({ v: ui.view, sheet: true }, '', location.hash); // 휴대폰 뒤로가기로 창 닫기
   root.innerHTML = `<div class="sheet-bg" data-act="closeSheet"><div class="sheet" role="dialog" aria-modal="true"><div class="grab"></div>${html}</div></div>`;
   const f = root.querySelector('input,textarea'); if (f) setTimeout(() => f.focus(), 60);
 }
-function closeSheet() { document.getElementById('sheet-root').innerHTML = ''; }
+function closeSheet(silent) {
+  const root = document.getElementById('sheet-root'); if (!root.innerHTML) return;
+  root.innerHTML = '';
+  if (!silent && history.state && history.state.sheet) { sheetPopSkip = true; history.back(); }
+}
 function confirmSheet(msg, act, id, yes = '삭제') {
   sheet(`<h2>${esc(msg)}</h2><div class="row" style="gap:8px"><button class="btn ghost grow" data-act="closeSheet">취소</button><button class="btn danger grow" data-act="${act}" data-id="${id}" data-confirm="1">${yes}</button></div>`);
 }
@@ -837,6 +853,7 @@ const actions = {
   delPlan: (el) => { const p = (S.plans || []).find((x) => x.id === el.dataset.id); if (!el.dataset.confirm) return confirmSheet(`‘${p ? p.title : ''}’ 계획을 삭제할까요?`, 'delPlan', el.dataset.id); S.plans = S.plans.filter((x) => x.id !== el.dataset.id); save(); closeSheet(); render(); },
   calHabit: (el) => { const d = ui.calSel; if (d > today()) return; setHabit(el.dataset.id, d, !isDone(el.dataset.id, d)); vibrate(); resettleFrom(d); save(); render(); },
   calTask: (el) => { const x = S.tasks.find((y) => y.id === el.dataset.id); if (!x) return; x.done = !x.done; vibrate(); resettleFrom(x.date); save(); render(); },
+  back: () => goBack(),
   raceTab: (el) => { ui.raceTab = el.dataset.k; render(); },
   addGoal: (el) => goalSheet(null, el.dataset.k),
   goalMenu: (el) => { const g = S.goals.find((x) => x.id === el.dataset.id); if (g) goalSheet(g); },
@@ -1014,7 +1031,14 @@ function rollover() { autoBackup(0); lastDay = today(); lastMascot = mascotIndex
 setInterval(() => { if (today() !== lastDay || mascotIndex() !== lastMascot) rollover(); }, 30000);
 document.addEventListener('visibilitychange', () => { if (document.hidden) autoBackup(5); });
 document.addEventListener('visibilitychange', () => { if (!document.hidden && (today() !== lastDay || mascotIndex() !== lastMascot)) rollover(); });
-window.addEventListener('hashchange', () => { const v = location.hash.slice(1); if (v && v !== ui.view) { ui.view = v; render(); } });
+window.addEventListener('popstate', () => {
+  if (sheetPopSkip) { sheetPopSkip = false; return; }
+  const root = document.getElementById('sheet-root');
+  if (root.innerHTML) { root.innerHTML = ''; return; } // 열린 창이 있으면 창만 닫기
+  const v = location.hash.slice(1) || 'today';
+  if (navDepth > 0) navDepth--;
+  if (v !== ui.view) { ui.view = v; render(); window.scrollTo(0, 0); }
+});
 
 const cleaned = cleanupExpired();
 settle();
